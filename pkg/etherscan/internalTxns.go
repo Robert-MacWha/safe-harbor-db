@@ -12,10 +12,10 @@ type InternalTransaction struct {
 	BlockNumber     web3.BigInt   `json:"blockNumber"`
 	TimeStamp       web3.BigInt   `json:"timeStamp"`
 	Hash            web3.Hash     `json:"hash"`
-	From            web3.Address  `json:"from"`
+	From            *web3.Address `json:"from"`
 	To              *web3.Address `json:"to,omitempty"`
 	Value           web3.BigInt   `json:"value"`
-	ContractAddress web3.Address  `json:"contractAddress"`
+	ContractAddress *web3.Address `json:"contractAddress"`
 	Input           web3.Bytes    `json:"input"`
 	Type            string        `json:"type"`
 	Gas             web3.BigInt   `json:"gas"`

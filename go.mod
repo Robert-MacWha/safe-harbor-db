@@ -5,7 +5,7 @@ go 1.22.1
 require (
 	cloud.google.com/go/firestore v1.15.0
 	firebase.google.com/go v3.13.0+incompatible
-	github.com/Skylock-ai/Arianrhod v1.0.5
+	github.com/Skylock-ai/Arianrhod v1.0.6
 	github.com/ethereum/go-ethereum v1.14.6
 	google.golang.org/api v0.187.0
 )

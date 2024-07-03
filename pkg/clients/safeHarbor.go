@@ -242,3 +242,45 @@ func fetchAgreementDetails(
 
 	return agreementDetails, nil
 }
+
+func (a *AgreementDetailsV1) ToMonitored(rpcClient *rpc.Client, apiKey string) (*Monitored, error) {
+	monitored := &Monitored{
+		MockData: a.MockData,
+	}
+
+	for _, chain := range a.Chains {
+		for _, account := range chain.Accounts {
+			chainID := chain.ID.Int64()
+			accountM := AccountM{
+				Address: account.AccountAddress.String(),
+				Chains:  []int{int(chainID)},
+			}
+
+			// Fill name for the account
+			err := fillName(&accountM, apiKey)
+			if err != nil {
+				return nil, fmt.Errorf("failed to fill name for account %s: %w", account.AccountAddress.String(), err)
+			}
+
+			// Find children if necessary
+			if account.ChildContractScope == ChildContractScopeAll {
+				children, err := findAllChildren(
+					*web3.CommonToAddress(account.AccountAddress),
+					[]int64{chainID},
+					account.ChildContractScope,
+					nil, // AgreementDetailsV1 doesn't have events, so pass nil
+					rpcClient,
+					apiKey,
+				)
+				if err != nil {
+					return nil, fmt.Errorf("failed to find children for account %s: %w", account.AccountAddress.String(), err)
+				}
+				accountM.Children = children
+			}
+
+			monitored.Addresses = append(monitored.Addresses, accountM)
+		}
+	}
+
+	return monitored, nil
+}

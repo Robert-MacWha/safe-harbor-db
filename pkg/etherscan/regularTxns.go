@@ -15,7 +15,7 @@ type RegularTransaction struct {
 	Nonce             web3.BigInt   `json:"nonce"`
 	BlockHash         web3.Hash     `json:"blockHash"`
 	TransactionIndex  web3.BigInt   `json:"transactionIndex"`
-	From              web3.Address  `json:"from"`
+	From              *web3.Address `json:"from,omitempty"`
 	To                *web3.Address `json:"to,omitempty"`
 	Value             web3.BigInt   `json:"value"`
 	Gas               web3.BigInt   `json:"gas"`
@@ -23,7 +23,7 @@ type RegularTransaction struct {
 	IsError           string        `json:"isError"`
 	TxreceiptStatus   string        `json:"txreceipt_status"`
 	Input             web3.Bytes    `json:"input"`
-	ContractAddress   web3.Address  `json:"contractAddress"`
+	ContractAddress   *web3.Address `json:"contractAddress,omitempty"`
 	CumulativeGasUsed web3.BigInt   `json:"cumulativeGasUsed"`
 	GasUsed           web3.BigInt   `json:"gasUsed"`
 	Confirmations     web3.BigInt   `json:"confirmations"`

@@ -1,6 +1,11 @@
 package clients
 
-import "github.com/Skylock-ai/Arianrhod/pkg/types/web3"
+import (
+	"fmt"
+
+	"github.com/Skylock-ai/Arianrhod/pkg/types/web3"
+	"github.com/ethereum/go-ethereum/rpc"
+)
 
 // Firewall represents a Skylock Firewall client
 type Firewall struct {
@@ -54,4 +59,50 @@ type EventFW struct {
 type BountyTermsFW struct {
 	BountyPercentage int
 	BountyCapUSD     int
+}
+
+func (f *Firewall) ToMonitored(rpcClient *rpc.Client, apiKey string) (*Monitored, error) {
+	monitored := &Monitored{
+		MockData: f.MockData,
+	}
+
+	for _, account := range f.Accounts {
+		accountM := AccountM{
+			Name:    account.Name,
+			Address: account.Address.String(),
+			Chains:  make([]int, len(account.ChainIDs)),
+		}
+
+		for i, chainID := range account.ChainIDs {
+			accountM.Chains[i] = int(chainID)
+		}
+
+		// Fill name for the account if it's not already set
+		if accountM.Name == "" {
+			err := fillName(&accountM, apiKey)
+			if err != nil {
+				return nil, fmt.Errorf("failed to fill name for account %s: %w", account.Address.String(), err)
+			}
+		}
+
+		// Find children if necessary
+		if account.ChildContractScope == ChildContractScopeAll || len(account.RegisteredEvents) > 0 {
+			children, err := findAllChildren(
+				account.Address,
+				account.ChainIDs,
+				account.ChildContractScope,
+				account.RegisteredEvents,
+				rpcClient,
+				apiKey,
+			)
+			if err != nil {
+				return nil, fmt.Errorf("failed to find children for account %s: %w", account.Address.String(), err)
+			}
+			accountM.Children = children
+		}
+
+		monitored.Addresses = append(monitored.Addresses, accountM)
+	}
+
+	return monitored, nil
 }

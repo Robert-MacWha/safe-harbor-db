@@ -79,6 +79,8 @@ func callEtherscanAPI(config basicConfig) ([]byte, error) {
 	baseURL := config.getBaseURL()
 	query := config.toQueryParams()
 
+	fmt.Println(fmt.Sprintf("%s?%s", baseURL, query.Encode()))
+
 	resp, err := http.Get(fmt.Sprintf("%s?%s", baseURL, query.Encode()))
 	if err != nil {
 		return nil, fmt.Errorf("failed to send request: %w", err)
@@ -106,7 +108,6 @@ func fetchAllData[T any](
 	fromBlock := config.getStartBlock()
 
 	for {
-
 		config.setStartBlock(fromBlock)
 		responseBytes, err := callEtherscanAPI(config)
 		if err != nil {
@@ -125,7 +126,7 @@ func fetchAllData[T any](
 		fromBlock = newLastBlock + 1
 
 		// 200 miliseconds because etherscan max rate is 5 requests per second
-		time.Sleep(200 * time.Millisecond) //nolint
+		time.Sleep(500 * time.Millisecond) //nolint
 	}
 
 	return allResults, nil
