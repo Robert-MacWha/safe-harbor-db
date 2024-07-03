@@ -3,6 +3,7 @@ package clients
 import (
 	"SHDB/pkg/etherscan"
 	"context"
+	"fmt"
 	"math/big"
 	"strings"
 
@@ -15,11 +16,16 @@ import (
 )
 
 type AgreementDetailsV1 struct {
-	ProtocolName   string
-	ContactDetails string
-	Chains         []ChainSH
-	BountyTerms    BountyTermsSH
-	AgreementURI   string
+	ProtocolName        string
+	ContactDetails      string
+	Chains              []ChainSH
+	BountyTerms         BountyTermsSH
+	AgreementURI        string
+	RegistryTransaction string
+	RegistryExplorerURL string
+	CreatedAt           int
+	Entity              common.Address
+	MockData            bool
 }
 
 type ChainSH struct {
@@ -30,19 +36,40 @@ type ChainSH struct {
 
 type AccountSH struct {
 	AccountAddress     common.Address
-	ChildContractScope uint8
+	ChildContractScope ChildContractScope
 	Signature          []byte
 }
+
+type ChildContractScope string
+
+const (
+	ChildContractScopeNone ChildContractScope = "None"
+	ChildContractScopeAll  ChildContractScope = "All"
+)
 
 type BountyTermsSH struct {
 	BountyPercentage *big.Int
 	BountyCapUSD     *big.Int
-	Verification     uint8
+	Verification     IdentityVerification
+}
+
+type IdentityVerification string
+
+const (
+	Retainable IdentityVerification = "Retainable"
+	Immunefi   IdentityVerification = "Immunefi"
+	Bugcrowd   IdentityVerification = "Bugcrowd"
+	Hackerone  IdentityVerification = "Hackerone"
+)
+
+var explorerPrefixes = map[int64]string{
+	1:        "https://etherscan.io/tx/",
+	11155111: "https://sepolia.etherscan.io/tx/",
 }
 
 const contractABI = `[{"inputs":[{"components":[{"internalType":"string","name":"protocolName","type":"string"},{"internalType":"string","name":"contactDetails","type":"string"},{"components":[{"internalType":"address","name":"assetRecoveryAddress","type":"address"},{"components":[{"internalType":"address","name":"accountAddress","type":"address"},{"internalType":"enum ChildContractScope","name":"childContractScope","type":"uint8"},{"internalType":"bytes","name":"signature","type":"bytes"}],"internalType":"struct Account[]","name":"accounts","type":"tuple[]"},{"internalType":"uint256","name":"id","type":"uint256"}],"internalType":"struct Chain[]","name":"chains","type":"tuple[]"},{"components":[{"internalType":"uint256","name":"bountyPercentage","type":"uint256"},{"internalType":"uint256","name":"bountyCapUSD","type":"uint256"},{"internalType":"enum IdentityVerification","name":"verification","type":"uint8"}],"internalType":"struct BountyTerms","name":"bountyTerms","type":"tuple"},{"internalType":"string","name":"agreementURI","type":"string"}],"internalType":"struct AgreementDetailsV1","name":"_details","type":"tuple"}],"stateMutability":"nonpayable","type":"constructor"},{"inputs":[],"name":"getDetails","outputs":[{"components":[{"internalType":"string","name":"protocolName","type":"string"},{"internalType":"string","name":"contactDetails","type":"string"},{"components":[{"internalType":"address","name":"assetRecoveryAddress","type":"address"},{"components":[{"internalType":"address","name":"accountAddress","type":"address"},{"internalType":"enum ChildContractScope","name":"childContractScope","type":"uint8"},{"internalType":"bytes","name":"signature","type":"bytes"}],"internalType":"struct Account[]","name":"accounts","type":"tuple[]"},{"internalType":"uint256","name":"id","type":"uint256"}],"internalType":"struct Chain[]","name":"chains","type":"tuple[]"},{"components":[{"internalType":"uint256","name":"bountyPercentage","type":"uint256"},{"internalType":"uint256","name":"bountyCapUSD","type":"uint256"},{"internalType":"enum IdentityVerification","name":"verification","type":"uint8"}],"internalType":"struct BountyTerms","name":"bountyTerms","type":"tuple"},{"internalType":"string","name":"agreementURI","type":"string"}],"internalType":"struct AgreementDetailsV1","name":"","type":"tuple"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"version","outputs":[{"internalType":"string","name":"","type":"string"}],"stateMutability":"pure","type":"function"}]`
 
-func GetSafeHarborAdoptions(apiKey string, rpcClient *rpc.Client) ([]Client, error) {
+func GetSafeHarborAdoptions(apiKey string, rpcClient *rpc.Client) ([]AgreementDetailsV1, error) {
 	const (
 		chainID               = int64(11155111)
 		factoryAddress        = "0x2697beaf5c0ddd825b952e0d5d41918c01f85dbb"
@@ -65,6 +92,11 @@ func GetSafeHarborAdoptions(apiKey string, rpcClient *rpc.Client) ([]Client, err
 	}
 
 	entitySafeHarborAdoption := make(map[web3.Address]web3.Address)
+	txHashes := make(map[web3.Address]web3.Hash)
+	blockTimes := make(map[web3.Address]web3.BigInt)
+
+	// Logs are returned in reverse chronological order, thus we use maps
+	// to store the latest log for each entity
 	for _, log := range logs {
 		if len(log.Topics) < 2 || len(log.Data) < 64 {
 			continue
@@ -81,14 +113,11 @@ func GetSafeHarborAdoptions(apiKey string, rpcClient *rpc.Client) ([]Client, err
 		}
 
 		entitySafeHarborAdoption[*entity] = *safeHarbor
+		txHashes[*entity] = log.TransactionHash
+		blockTimes[*entity] = log.TimeStamp
 	}
 
-	addresses := make([]web3.Address, 0, len(entitySafeHarborAdoption))
-	for _, address := range entitySafeHarborAdoption {
-		addresses = append(addresses, address)
-	}
-
-	return fetchAgreementDetails(addresses, rpcClient)
+	return fetchAgreementDetails(entitySafeHarborAdoption, txHashes, blockTimes, chainID, rpcClient)
 }
 
 func uint8ToChildContractScope(value uint8) ChildContractScope {
@@ -117,20 +146,26 @@ func uint8ToIdentityVerification(value uint8) IdentityVerification {
 	}
 }
 
-func fetchAgreementDetails(addresses []web3.Address, rpcClient *rpc.Client) ([]Client, error) {
+func fetchAgreementDetails(
+	entitySafeHarborAdoption map[web3.Address]web3.Address,
+	txHashes map[web3.Address]web3.Hash,
+	blockTimes map[web3.Address]web3.BigInt,
+	chainID int64,
+	rpcClient *rpc.Client,
+) ([]AgreementDetailsV1, error) {
 	client := ethclient.NewClient(rpcClient)
 	parsedABI, err := abi.JSON(strings.NewReader(contractABI))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to parse ABI: %w", err)
 	}
 
-	var clients []Client
+	var agreementDetails []AgreementDetailsV1
 
-	for _, address := range addresses {
-		commonAddress := address.ToCommon()
+	for entity, safeHarborAddress := range entitySafeHarborAdoption {
+		commonAddress := safeHarborAddress.ToCommon()
 		callData, err := parsedABI.Pack("getDetails")
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to pack call data: %w", err)
 		}
 
 		data, err := client.CallContract(context.Background(), ethereum.CallMsg{
@@ -138,52 +173,72 @@ func fetchAgreementDetails(addresses []web3.Address, rpcClient *rpc.Client) ([]C
 			Data: callData,
 		}, nil)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to call contract: %w", err)
 		}
 
 		var result struct {
-			AgreementDetails AgreementDetailsV1
+			AgreementDetails struct {
+				ProtocolName   string
+				ContactDetails string
+				Chains         []struct {
+					AssetRecoveryAddress common.Address
+					Accounts             []struct {
+						AccountAddress     common.Address
+						ChildContractScope uint8
+						Signature          []byte
+					}
+					ID *big.Int
+				}
+				BountyTerms struct {
+					BountyPercentage *big.Int
+					BountyCapUSD     *big.Int
+					Verification     uint8
+				}
+				AgreementURI string
+			}
 		}
 
 		if err := parsedABI.UnpackIntoInterface(&result, "getDetails", data); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to unpack result: %w", err)
 		}
 
-		// Convert AgreementDetailsV1 to Client
-		newClient := Client{
-			ProtocolName:   result.AgreementDetails.ProtocolName,
-			AgreementURI:   result.AgreementDetails.AgreementURI,
-			ContactDetails: result.AgreementDetails.ContactDetails,
-			BountyTerms: BountyTerms{
-				BountyPercentage: int(result.AgreementDetails.BountyTerms.BountyPercentage.Int64()),
-				BountyCapUSD:     int(result.AgreementDetails.BountyTerms.BountyCapUSD.Int64()),
-				Retainable:       uint8ToIdentityVerification(result.AgreementDetails.BountyTerms.Verification),
-			},
+		// Convert the result to our new struct format
+		agreement := AgreementDetailsV1{
+			ProtocolName:        result.AgreementDetails.ProtocolName,
+			ContactDetails:      result.AgreementDetails.ContactDetails,
+			AgreementURI:        result.AgreementDetails.AgreementURI,
+			Entity:              entity.ToCommon(),
+			RegistryTransaction: txHashes[entity].String(),
+			RegistryExplorerURL: fmt.Sprintf("%s%s", explorerPrefixes[chainID], txHashes[entity].String()),
+			CreatedAt:           int(blockTimes[entity].Int64()),
 		}
 
 		// Convert Chains
 		for _, chain := range result.AgreementDetails.Chains {
-			newChain := Chain{
-				AssetRecoveryAddress: web3.Address(chain.AssetRecoveryAddress),
-				ChainID:              chain.ID.Int64(),
+			chainSH := ChainSH{
+				AssetRecoveryAddress: chain.AssetRecoveryAddress,
+				ID:                   chain.ID,
 			}
-			newClient.Chains = append(newClient.Chains, newChain)
-
-			// Convert Accounts
 			for _, account := range chain.Accounts {
-				newAccount := Account{
-					Address:            web3.Address(account.AccountAddress),
+				accountSH := AccountSH{
+					AccountAddress:     account.AccountAddress,
 					ChildContractScope: uint8ToChildContractScope(account.ChildContractScope),
-					SignatureValid:     len(account.Signature) > 0,
-					ChainIDs:           []int64{chain.ID.Int64()},
-					LastQuery:          make(map[int64]int),
+					Signature:          account.Signature,
 				}
-				newClient.Accounts = append(newClient.Accounts, newAccount)
+				chainSH.Accounts = append(chainSH.Accounts, accountSH)
 			}
+			agreement.Chains = append(agreement.Chains, chainSH)
 		}
 
-		clients = append(clients, newClient)
+		// Convert BountyTerms
+		agreement.BountyTerms = BountyTermsSH{
+			BountyPercentage: result.AgreementDetails.BountyTerms.BountyPercentage,
+			BountyCapUSD:     result.AgreementDetails.BountyTerms.BountyCapUSD,
+			Verification:     uint8ToIdentityVerification(result.AgreementDetails.BountyTerms.Verification),
+		}
+
+		agreementDetails = append(agreementDetails, agreement)
 	}
 
-	return clients, nil
+	return agreementDetails, nil
 }

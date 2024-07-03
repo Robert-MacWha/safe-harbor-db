@@ -1,4 +1,3 @@
-// Package clients provides access to protocol information via external APIs.
 package clients
 
 import (
@@ -7,6 +6,19 @@ import (
 	"io"
 	"net/http"
 )
+
+// ProtocolInfo contains basic information about a protocol including the name,
+// website URL, icon URL, total value locked (TVL) data, category, and contact details.
+// This is the struct to be included in the Protocols Collection
+type ProtocolInfo struct {
+	Name           string
+	Website        string
+	Icon           string
+	TVL            int
+	Category       string
+	ContactDetails []string
+	MockData       bool
+}
 
 // protocolDetail contains detailed information about a specific protocol including
 // the name, URL, total value locked (TVL) data, Twitter handle, and logo.
@@ -34,20 +46,26 @@ type protocolSummary struct {
 // GetProtocolInfo fetches and returns detailed information about a specific protocol
 // including its name, URL, latest TVL, category based on Twitter handle, Twitter handle,
 // and logo URL. It returns an error if any issues occur during the API calls or data processing.
-func GetProtocolInfo(protocolName string) (name string, url string, tvl float64, category string, twitter string, logo string, err error) {
+func GetProtocolInfo(protocolName string) (protocolInfo *ProtocolInfo, err error) {
 	protocolDetail, err := fetchProtocolDetail(protocolName)
 	if err != nil {
-		return "", "", 0, "", "", "", err
+		return nil, err
 	}
 
 	protocols, err := fetchAllProtocols()
 	if err != nil {
-		return "", "", 0, "", "", "", err
+		return nil, err
 	}
 
-	category = matchTwitter(protocols, protocolDetail.Twitter)
+	category := matchTwitter(protocols, protocolDetail.Twitter)
 
-	return protocolDetail.Name, protocolDetail.URL, getLastTVL(protocolDetail.TVL), category, protocolDetail.Twitter, protocolDetail.Logo, nil
+	return &ProtocolInfo{
+		Name:     protocolDetail.Name,
+		Website:  protocolDetail.URL,
+		Icon:     protocolDetail.Logo,
+		TVL:      int(getLastTVL(protocolDetail.TVL)),
+		Category: category,
+	}, nil
 }
 
 // fetchProtocolDetail retrieves the protocol details from the external API

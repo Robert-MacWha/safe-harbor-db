@@ -49,15 +49,6 @@ type Account struct {
 	LastQuery map[int64]int //ChainID:Block
 }
 
-type AddressLocationType string
-
-const (
-	// AddressLocationTypeTopic is when the address is in the topic
-	AddressLocationTypeTopic AddressLocationType = "Topic"
-	// AddressLocationTypeData is when the address is in the data
-	AddressLocationTypeData AddressLocationType = "Data"
-)
-
 // Event represents an event to register for a contract.
 type Event struct {
 	Topic0              web3.Hash
@@ -65,34 +56,11 @@ type Event struct {
 	AddressLocation     int
 }
 
-type IdentityVerification string
-
-const (
-	// Retainable is when the identity is retainable
-	Retainable IdentityVerification = "Retainable"
-	// Immunefi is when the identity is verified through Immunefi
-	Immunefi IdentityVerification = "Immunefi"
-	// Bugcrowd is when the identity is verified through Bugcrowd
-	Bugcrowd IdentityVerification = "Bugcrowd"
-	// Hackerone is when the identity is verified through Hackerone
-	Hackerone IdentityVerification = "Hackerone"
-)
-
 type BountyTerms struct {
 	BountyPercentage int
 	BountyCapUSD     int
 	Retainable       IdentityVerification
 }
-
-// ChildContractScope represents the scope of child contracts to include.
-type ChildContractScope string
-
-const (
-	// ChildContractScopeNone is when no child contracts are included
-	ChildContractScopeNone ChildContractScope = "None"
-	// ChildContractScopeAll is when all child contracts, both existing and new, are included
-	ChildContractScopeAll ChildContractScope = "All"
-)
 
 func (c *Client) GetClientInformation(
 	rpcClient *rpc.Client,
@@ -109,17 +77,17 @@ func (c *Client) GetClientInformation(
 		}
 	}
 
-	_, url, tvl, category, _, logo, err := GetProtocolInfo(c.ProtocolName)
-	if err != nil {
-		// This is to be expected as the naming on Defillama isn't consistent
-		fmt.Println("Error, could not fetch protocol info for ", c.ProtocolName, err)
-		return nil
-	}
+	// _, url, tvl, category, _, logo, err := GetProtocolInfo(c.ProtocolName)
+	// if err != nil {
+	// 	// This is to be expected as the naming on Defillama isn't consistent
+	// 	fmt.Println("Error, could not fetch protocol info for ", c.ProtocolName, err)
+	// 	return nil
+	// }
 
-	c.Website = url
-	c.TVL = int(tvl)
-	c.Category = category
-	c.Icon = logo
+	// c.Website = url
+	// c.TVL = int(tvl)
+	// c.Category = category
+	// c.Icon = logo
 
 	return nil
 }
