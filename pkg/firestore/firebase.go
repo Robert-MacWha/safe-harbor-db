@@ -29,7 +29,7 @@ func initFirestore() (*firestore.Client, error) {
 func WriteProtocolInfoToFirestore(client *firestore.Client, info clients.ProtocolInfo) (*firestore.DocumentRef, error) {
 	ctx := context.Background()
 
-	docRef, _, err := client.Collection("protocols").Add(ctx, map[string]interface{}{
+	_, err := client.Collection("protocols").Doc(info.Name).Set(ctx, map[string]interface{}{
 		"name":           info.Name,
 		"website":        info.Website,
 		"icon":           info.Icon,
@@ -42,14 +42,17 @@ func WriteProtocolInfoToFirestore(client *firestore.Client, info clients.Protoco
 		return nil, err
 	}
 
+	docRef := client.Collection("protocols").Doc(info.Name)
+
 	return docRef, nil
 }
 
 // WriteAgreementDetailsToFirestore writes an AgreementDetailsV1 struct to the 'safeHarborAgreements' collection
-func WriteAgreementDetailsToFirestore(client *firestore.Client, details clients.AgreementDetailsV1, protocolRef *firestore.DocumentRef) (*firestore.DocumentRef, error) {
+func WriteAgreementDetailsToFirestore(client *firestore.Client, protocolName string, details clients.AgreementDetailsV1, protocolRef *firestore.DocumentRef) (*firestore.DocumentRef, error) {
 	ctx := context.Background()
 
-	docRef, _, err := client.Collection("safeHarborAgreements").Add(ctx, map[string]interface{}{
+	// docRef, _, err := client.Collection("safeHarborAgreements").Add(ctx, map[string]interface{}{
+	_, err := client.Collection("safeHarborAgreements").Doc(protocolName).Set(ctx, map[string]interface{}{
 		"protocol":            protocolRef,
 		"registryTransaction": details.RegistryTransaction,
 		"registryExplorerURL": details.RegistryExplorerURL,
@@ -69,14 +72,17 @@ func WriteAgreementDetailsToFirestore(client *firestore.Client, details clients.
 		return nil, err
 	}
 
+	docRef := client.Collection("safeHarborAgreements").Doc(protocolName)
+
 	return docRef, nil
 }
 
 // WriteFirewallToFirestore writes a Firewall struct to the 'firewallAgreements' collection
-func WriteFirewallToFirestore(client *firestore.Client, firewall clients.Firewall, protocolRef *firestore.DocumentRef) (*firestore.DocumentRef, error) {
+func WriteFirewallToFirestore(client *firestore.Client, protocolName string, firewall clients.Firewall, protocolRef *firestore.DocumentRef) (*firestore.DocumentRef, error) {
 	ctx := context.Background()
 
-	docRef, _, err := client.Collection("firewallAgreements").Add(ctx, map[string]interface{}{
+	// docRef, _, err := client.Collection("firewallAgreements").Add(ctx, map[string]interface{}{
+	_, err := client.Collection("firewallAgreements").Doc(protocolName).Set(ctx, map[string]interface{}{
 		"protocol":    protocolRef,
 		"chains":      firewallChainsToFirestoreArray(firewall.Chains),
 		"accounts":    firewallAccountsToFirestoreArray(firewall.Accounts),
@@ -84,14 +90,20 @@ func WriteFirewallToFirestore(client *firestore.Client, firewall clients.Firewal
 		"createdAt":   firestore.ServerTimestamp,
 	})
 
-	return docRef, err
+	if err != nil {
+		return nil, err
+	}
+
+	docRef := client.Collection("firewallAgreements").Doc(protocolName)
+
+	return docRef, nil
 }
 
 // WriteMonitoredToFirestore writes a Monitored struct to the 'monitorableAddresses' collection
-func WriteMonitoredToFirestore(client *firestore.Client, monitored clients.Monitored, protocolRef, safeHarborRef, firewallRef *firestore.DocumentRef) (*firestore.DocumentRef, error) {
+func WriteMonitoredToFirestore(client *firestore.Client, protocolName string, monitored clients.Monitored, protocolRef, safeHarborRef, firewallRef *firestore.DocumentRef) (*firestore.DocumentRef, error) {
 	ctx := context.Background()
 
-	docRef, _, err := client.Collection("monitorableAddresses").Add(ctx, map[string]interface{}{
+	_, err := client.Collection("monitorableAddresses").Doc(protocolName).Set(ctx, map[string]interface{}{
 		"protocol":            protocolRef,
 		"safeHarborAgreement": safeHarborRef,
 		"firewallAgreement":   firewallRef,
@@ -102,7 +114,9 @@ func WriteMonitoredToFirestore(client *firestore.Client, monitored clients.Monit
 		return nil, err
 	}
 
-	return docRef, nil
+	ref := client.Collection("monitorableAddresses").Doc(protocolName)
+
+	return ref, nil
 }
 
 // Helper functions

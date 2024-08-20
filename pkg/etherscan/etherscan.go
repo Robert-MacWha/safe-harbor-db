@@ -126,7 +126,7 @@ func fetchAllData[T any](
 		fromBlock = newLastBlock + 1
 
 		// 200 miliseconds because etherscan max rate is 5 requests per second
-		time.Sleep(500 * time.Millisecond) //nolint
+		time.Sleep(1000 * time.Millisecond) //nolint
 	}
 
 	return allResults, nil

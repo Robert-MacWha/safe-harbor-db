@@ -120,13 +120,13 @@ func processNewAdoption(ctx context.Context, rpcClient *rpc.Client, firestoreCli
 	}
 
 	// Write agreement details to Firestore
-	agreementRef, err := firestoreClients.WriteAgreementDetailsToFirestore(firestoreClient, adoption, protocolRef)
+	agreementRef, err := firestoreClients.WriteAgreementDetailsToFirestore(firestoreClient, adoption.ProtocolName, adoption, protocolRef)
 	if err != nil {
 		return fmt.Errorf("failed to write agreement details: %w", err)
 	}
 
 	// Write Monitored data to Firestore
-	_, err = firestoreClients.WriteMonitoredToFirestore(firestoreClient, *monitored, protocolRef, agreementRef, nil)
+	_, err = firestoreClients.WriteMonitoredToFirestore(firestoreClient, adoption.ProtocolName, *monitored, protocolRef, agreementRef, nil)
 	if err != nil {
 		return fmt.Errorf("failed to write monitored data: %w", err)
 	}
