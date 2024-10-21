@@ -11,6 +11,7 @@ import (
 
 var chainIDBaseURLs = map[int64]string{
 	1:        "https://api.etherscan.io/api",
+	137:      "https://api.polygonscan.com/api",
 	11155111: "https://api-sepolia.etherscan.io/api",
 }
 
@@ -79,7 +80,7 @@ func callEtherscanAPI(config basicConfig) ([]byte, error) {
 	baseURL := config.getBaseURL()
 	query := config.toQueryParams()
 
-	fmt.Println(fmt.Sprintf("%s?%s", baseURL, query.Encode()))
+	// fmt.Println(fmt.Sprintf("%s?%s", baseURL, query.Encode()))
 
 	resp, err := http.Get(fmt.Sprintf("%s?%s", baseURL, query.Encode()))
 	if err != nil {

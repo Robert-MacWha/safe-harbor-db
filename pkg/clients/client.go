@@ -191,8 +191,6 @@ func getAllSubContractAddresses(
 ) ([]web3.Address, error) {
 	var addresses []web3.Address
 
-	fmt.Println("Debug: Address", address, chainID)
-
 	// Fetch regular transactions
 	regularTransactions, err := etherscan.FetchRegularTransactions(chainID, apiKey, address, startBlock)
 	if err != nil {

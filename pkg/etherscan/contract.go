@@ -9,8 +9,8 @@ import (
 	"github.com/Skylock-ai/Arianrhod/pkg/types/web3"
 )
 
-// GetSourceCode represents a result from the GetSourceCode API call
-type GetSourceCode struct {
+// SourceCode represents a result from the SourceCode API call
+type SourceCode struct {
 	// ContractName string `json:"ContractName"`
 	ABI                  string `json:"ABI"`
 	ContractName         string `json:"ContractName"`
@@ -27,9 +27,9 @@ type GetSourceCode struct {
 }
 
 type apiGetSourceCodeResponse struct {
-	Status  string          `json:"status"`
-	Message string          `json:"message"`
-	Result  []GetSourceCode `json:"result"`
+	Status  string       `json:"status"`
+	Message string       `json:"message"`
+	Result  []SourceCode `json:"result"`
 }
 
 type apiGetSourceCodeConfig struct {
@@ -53,7 +53,7 @@ func (c apiGetSourceCodeConfig) getBaseURL() string {
 	return c.BaseURL
 }
 
-func processGetSourceCode(responseBytes []byte) (*GetSourceCode, error) {
+func processGetSourceCode(responseBytes []byte) (*SourceCode, error) {
 	var apiResponse apiGetSourceCodeResponse
 	if err := json.Unmarshal(responseBytes, &apiResponse); err != nil {
 		return nil, fmt.Errorf("failed to decode response: %w", err)
@@ -67,7 +67,7 @@ func FetchSourceCode(
 	chainID int64,
 	apiKey string,
 	address web3.Address,
-) (*GetSourceCode, error) {
+) (*SourceCode, error) {
 	baseURL, ok := chainIDBaseURLs[chainID]
 	if !ok {
 		return nil, fmt.Errorf("chain ID %d not supported", chainID)
