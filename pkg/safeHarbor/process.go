@@ -19,6 +19,7 @@ type ChainConfig struct {
 func ProcessSafeHarborAgreement(
 	safeHarbor *SafeHarborAgreement,
 	chainConfigs map[int64]ChainConfig,
+	startBlock int,
 ) (*SafeHarborAgreement, error) {
 	// Process the SafeHarborAgreement
 	for _, chain := range safeHarbor.Chains {
@@ -68,7 +69,7 @@ func ProcessSafeHarborAgreement(
 					chainId,
 					apiKey,
 					*web3Address,
-					0,
+					startBlock,
 				)
 				if err != nil {
 					log.Error("Failed to get child contract addresses", "error", err)

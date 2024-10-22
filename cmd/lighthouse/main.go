@@ -10,12 +10,14 @@ import (
 	"log"
 	"math/big"
 	"os"
+	"strconv"
 	"sync"
 	"time"
 
 	"cloud.google.com/go/firestore"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/urfave/cli/v2"
+	"google.golang.org/api/iterator"
 	"google.golang.org/api/option"
 
 	// Import necessary types
@@ -99,6 +101,8 @@ func Run(c *cli.Context) error {
 			}
 		}(registryConfig)
 	}
+
+	go monitorSafeHarborProtocols(firestoreClient, chainConfigs)
 
 	wg.Wait()
 	return nil
@@ -336,4 +340,97 @@ func newFirestoreClient(credsPath string) (*firestore.Client, error) {
 	}
 
 	return client, nil
+}
+
+// monitorSafeHarborProtocols runs every hour and processes all active Safe Harbor protocols.
+func monitorSafeHarborProtocols(
+	firestoreClient *firestore.Client,
+	chainConfigs map[int64]safeharbor.ChainConfig,
+) {
+	for {
+		log.Println("Fetching and processing current Safe Harbor protocols...")
+
+		// Fetch all the current Safe Harbor protocols from Firestore
+		err := fetchAndProcessSafeHarborAgreements(firestoreClient, chainConfigs)
+		if err != nil {
+			log.Printf("Error fetching or processing agreements: %v", err)
+		}
+
+		// Wait for 1 hour before running the next check
+		time.Sleep(1 * time.Hour)
+	}
+}
+
+// fetchAndProcessSafeHarborAgreements retrieves all active Safe Harbor protocols from Firestore and processes them.
+func fetchAndProcessSafeHarborAgreements(
+	firestoreClient *firestore.Client,
+	chainConfigs map[int64]safeharbor.ChainConfig,
+) error {
+	ctx := context.Background()
+	collection := firestoreClient.Collection("safeHarborAgreements")
+	iter := collection.Documents(ctx)
+	defer iter.Stop()
+
+	for {
+		doc, err := iter.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			return fmt.Errorf("error iterating Firestore documents: %w", err)
+		}
+
+		// Extract SafeHarborAgreement from Firestore document
+		var agreement safeharbor.SafeHarborAgreement
+		err = doc.DataTo(&agreement)
+		if err != nil {
+			log.Printf("Failed to parse Firestore data for agreement: %v", err)
+			continue
+		}
+
+		// Process the Safe Harbor agreement for each chain
+		for _, chain := range agreement.Chains {
+			chainID, err := strconv.Atoi(chain.ID)
+			if err != nil {
+				log.Printf("Invalid chain ID for agreement: %s", err)
+				continue
+			}
+
+			// Get the latest indexed block for this chain
+			startBlock := chain.LastIndexedBlock
+
+			// Call ProcessSafeHarborAgreement function
+			processedAgreement, err := safeharbor.ProcessSafeHarborAgreement(&agreement, chainConfigs, startBlock)
+			if err != nil {
+				log.Printf("Failed to process agreement for chain %d: %v", chainID, err)
+				continue
+			}
+
+			// Update Firestore with the latest Safe Harbor agreement details
+			err = updateSafeHarborAgreement(firestoreClient, processedAgreement)
+			if err != nil {
+				log.Printf("Failed to update agreement in Firestore: %v", err)
+				continue
+			}
+
+			log.Printf("Successfully processed and updated agreement for chain %d", chainID)
+		}
+	}
+
+	return nil
+}
+
+// updateSafeHarborAgreement uploads the processed Safe Harbor agreement back to Firestore.
+func updateSafeHarborAgreement(
+	firestoreClient *firestore.Client,
+	agreement *safeharbor.SafeHarborAgreement,
+) error {
+	ctx := context.Background()
+	_, err := firestoreClient.Collection("safeHarborAgreements").Doc(agreement.Protocol.Path).Set(ctx, agreement)
+	if err != nil {
+		return fmt.Errorf("failed to update Safe Harbor agreement in Firestore: %w", err)
+	}
+
+	log.Printf("Agreement for protocol %s successfully updated in Firestore", agreement.Protocol.Path)
+	return nil
 }

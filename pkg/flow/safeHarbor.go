@@ -48,7 +48,7 @@ func ProcessSafeHarborAgreement(
 	log.Printf("Fetched agreement: %+v", agreement)
 
 	// Step 3: Process the agreement details (e.g., with additional business logic)
-	agreement, err = safeharbor.ProcessSafeHarborAgreement(agreement, chainConfigs)
+	agreement, err = safeharbor.ProcessSafeHarborAgreement(agreement, chainConfigs, 0)
 	if err != nil {
 		return fmt.Errorf("failed to process agreement details: %w", err)
 	}
