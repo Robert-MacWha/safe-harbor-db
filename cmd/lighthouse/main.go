@@ -24,6 +24,12 @@ import (
 	"github.com/Skylock-ai/Arianrhod/pkg/types/web3"
 )
 
+// const updateRegistryInterval = 1 * time.Hour
+// const updateProtocolsInterval = 1 * time.Hour
+
+const updateRegistryInterval = 10 * time.Second
+const updateProtocolsInterval = 10 * time.Second
+
 type RegistryConfig struct {
 	ChainID         int64  `json:"chainId"`
 	RegistryAddress string `json:"registryAddress"`
@@ -102,7 +108,7 @@ func Run(c *cli.Context) error {
 		}(registryConfig)
 	}
 
-	go monitorSafeHarborProtocols(firestoreClient, chainConfigs)
+	// go monitorSafeHarborProtocols(firestoreClient, chainConfigs)
 
 	wg.Wait()
 	return nil
@@ -123,14 +129,15 @@ func monitorRegistry(
 	// Initialize last processed block number
 	var lastProcessedBlock int64 = 0
 
+	log.Printf("Monitoring ChainID: %d, RegistryAddress: %s", chainID, registryConfig.RegistryAddress)
+
 	for {
-		log.Printf("Monitoring ChainID: %d, RegistryAddress: %s", chainID, registryConfig.RegistryAddress)
 		lastProcessedBlock, err = processEvents(registryConfig, chainConfigs, firestoreClient, apiKey, address, lastProcessedBlock)
 		if err != nil {
 			log.Printf("Error processing events for ChainID %d: %v", chainID, err)
 		}
 
-		time.Sleep(1 * time.Hour)
+		time.Sleep(updateRegistryInterval)
 	}
 }
 
@@ -150,7 +157,6 @@ func processEvents(
 		return 0, fmt.Errorf("failed to fetch events: %w", err)
 	}
 
-	// Update the last processed block number
 	for _, event := range events {
 		// Process each event
 		err := processAgreementEvent(event, chainID, chainConfigs, firestoreClient)
@@ -190,7 +196,9 @@ func fetchEventsFromEtherscan(
 		return nil, fmt.Errorf("failed to fetch logs: %w", err)
 	}
 
-	var events []EtherscanEvent
+	// Create a map to store the latest event for each deployer (entity)
+	latestEvents := make(map[string]EtherscanEvent)
+
 	for _, logEntry := range logs {
 		if len(logEntry.Topics) < 2 {
 			continue
@@ -225,6 +233,19 @@ func fetchEventsFromEtherscan(
 			SafeHarborAddress: *safeHarborAddress,
 		}
 
+		// Store the latest event for each deployer (entity)
+		deployerKey := deployer.String()
+		latestEvent, exists := latestEvents[deployerKey]
+
+		// If this event's block number is higher than the currently stored event, update it
+		if !exists || blockNumber.Int64() > latestEvent.BlockNumber {
+			latestEvents[deployerKey] = event
+		}
+	}
+
+	// Collect the latest events into a slice
+	var events []EtherscanEvent
+	for _, event := range latestEvents {
 		events = append(events, event)
 	}
 
@@ -246,7 +267,9 @@ func processAgreementEvent(
 		return fmt.Errorf("failed to check existing agreement: %w", err)
 	}
 
-	if exists && existingBlockNumber >= event.BlockNumber {
+	fmt.Println("YOOOOOOOOOOOOOOOOO", exists, existingBlockNumber, event.TimeStamp)
+
+	if exists && existingBlockNumber >= event.TimeStamp {
 		log.Printf("Skipping older or same agreement for deployer %s", protocolID)
 		return nil // Skip processing
 	}
@@ -273,32 +296,28 @@ func processAgreementEvent(
 }
 
 func checkExistingAgreement(firestoreClient *firestore.Client, eoa string) (bool, int64, error) {
-	// Query Firestore to find if there's an existing agreement from the same EOA
-	// Return whether it exists and its block time
+	// Query Firestore to find the agreement for the specified EOA
 	ctx := context.Background()
-	iter := firestoreClient.Collection("safeHarborAgreements").Where("deployer", "==", eoa).Documents(ctx)
+	docRef := firestoreClient.Collection("safeHarborAgreements").Where("entity", "==", eoa).Limit(1)
+	iter := docRef.Documents(ctx)
 	defer iter.Stop()
 
-	docs, err := iter.GetAll()
+	doc, err := iter.Next()
+	if err == iterator.Done {
+		return false, 0, nil // No document found
+	}
 	if err != nil {
 		return false, 0, fmt.Errorf("failed to query Firestore: %w", err)
 	}
 
-	if len(docs) == 0 {
-		return false, 0, nil
+	// Extract and return the `createdAt` timestamp from the document
+	data := doc.Data()
+	createdAt, ok := data["createdAt"].(time.Time)
+	if !ok {
+		return false, 0, fmt.Errorf("failed to parse createdAt field")
 	}
 
-	// Assume we're interested in the latest agreement
-	var latestBlockTime int64
-	for _, doc := range docs {
-		data := doc.Data()
-		blockTime, ok := data["blockTime"].(int64)
-		if ok && blockTime > latestBlockTime {
-			latestBlockTime = blockTime
-		}
-	}
-
-	return true, latestBlockTime, nil
+	return true, int64(createdAt.Unix()), nil
 }
 
 func loadRegistryConfigs(filePath string) ([]RegistryConfig, error) {
@@ -334,7 +353,7 @@ func loadChainConfigs(filePath string) (map[int64]safeharbor.ChainConfig, error)
 func newFirestoreClient(credsPath string) (*firestore.Client, error) {
 	ctx := context.Background()
 
-	client, err := firestore.NewClient(ctx, "your-project-id", option.WithCredentialsFile(credsPath))
+	client, err := firestore.NewClient(ctx, "skylock-xyz", option.WithCredentialsFile(credsPath))
 	if err != nil {
 		return nil, fmt.Errorf("firestore.NewClient: %w", err)
 	}
@@ -342,7 +361,7 @@ func newFirestoreClient(credsPath string) (*firestore.Client, error) {
 	return client, nil
 }
 
-// monitorSafeHarborProtocols runs every hour and processes all active Safe Harbor protocols.
+// monitorSafeHarborProtocols runs every updateProtocolsInterval time and processes all active Safe Harbor protocols.
 func monitorSafeHarborProtocols(
 	firestoreClient *firestore.Client,
 	chainConfigs map[int64]safeharbor.ChainConfig,
@@ -356,8 +375,7 @@ func monitorSafeHarborProtocols(
 			log.Printf("Error fetching or processing agreements: %v", err)
 		}
 
-		// Wait for 1 hour before running the next check
-		time.Sleep(1 * time.Hour)
+		time.Sleep(updateProtocolsInterval)
 	}
 }
 
@@ -406,8 +424,14 @@ func fetchAndProcessSafeHarborAgreements(
 				continue
 			}
 
+			err = processedAgreement.Upload(firestoreClient, doc.Ref.ID)
+			if err != nil {
+				log.Printf("Failed to upload processed agreement to Firestore: %v", err)
+				continue
+			}
+
 			// Update Firestore with the latest Safe Harbor agreement details
-			err = updateSafeHarborAgreement(firestoreClient, processedAgreement)
+			err = safeharbor.SetProtocol(firestoreClient, doc.Ref.ID)
 			if err != nil {
 				log.Printf("Failed to update agreement in Firestore: %v", err)
 				continue
@@ -417,20 +441,5 @@ func fetchAndProcessSafeHarborAgreements(
 		}
 	}
 
-	return nil
-}
-
-// updateSafeHarborAgreement uploads the processed Safe Harbor agreement back to Firestore.
-func updateSafeHarborAgreement(
-	firestoreClient *firestore.Client,
-	agreement *safeharbor.SafeHarborAgreement,
-) error {
-	ctx := context.Background()
-	_, err := firestoreClient.Collection("safeHarborAgreements").Doc(agreement.Protocol.Path).Set(ctx, agreement)
-	if err != nil {
-		return fmt.Errorf("failed to update Safe Harbor agreement in Firestore: %w", err)
-	}
-
-	log.Printf("Agreement for protocol %s successfully updated in Firestore", agreement.Protocol.Path)
 	return nil
 }

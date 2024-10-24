@@ -3,18 +3,35 @@ package process
 import (
 	"SHDB/pkg/etherscan"
 	"SHDB/pkg/firewall"
-	"SHDB/pkg/trace"
+	"context"
 	"fmt"
 
 	"github.com/Skylock-ai/Arianrhod/pkg/types/web3"
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rpc"
 )
+
+// Define a call object that matches the structure
+type call struct {
+	Type    string        `json:"type"`
+	From    web3.Address  `json:"from"`
+	To      *web3.Address `json:"to,omitempty"`
+	Gas     web3.BigInt   `json:"gas"`
+	GasUsed web3.BigInt   `json:"gasUsed"`
+	Input   string        `json:"input"`
+	Output  string        `json:"output"`
+	Value   web3.BigInt   `json:"value"`
+	Calls   []call        `json:"calls,omitempty"` // Subcalls are also of type Call
+}
+
+// debugResult holds the root call
+type debugResult struct {
+	Calls []call `json:"calls"`
+}
 
 func GetNameOrEmpty(address web3.Address, chainID int64, apiKey string) string {
 	result, err := etherscan.FetchSourceCode(chainID, apiKey, address)
 	if err != nil {
-		log.Error("Failed to fetch source code", "error", err)
+		fmt.Println("Failed to fetch source code", "error", err)
 		return ""
 	}
 
@@ -110,11 +127,17 @@ func GetAllSubContractAddresses(
 		txHashes = append(txHashes, tx.Hash)
 	}
 
-	var traces []trace.Tracer
-	traces = append(traces, trace.CallTracer)
-
 	// To avoid tracing the same transactions multiple times we cache the function signatures
 	noSubContractFunctionSignatures := make(map[string]bool)
+
+	// Prepare the tracer parameters
+	params := map[string]interface{}{
+		"tracer": "callTracer",
+		"tracerConfig": map[string]interface{}{
+			"onlyTopCall": false, // Change to true if you want only the top-level call
+			"timeout":     "60s", // Timeout configuration
+		},
+	}
 
 	for _, txHash := range txHashes {
 		var txBody web3.TxBody
@@ -137,30 +160,21 @@ func GetAllSubContractAddresses(
 			continue
 		}
 
-		traceResults, err := trace.TraceTransaction(rpcClient, &txHash, traces)
-
+		var result debugResult
+		// Perform the RPC call to debug_traceTransaction
+		err = rpcClient.CallContext(context.Background(), &result, "debug_traceTransaction", txHash, params)
 		if err != nil {
+			fmt.Println("Failed to trace transaction", "error", err)
 			return nil, fmt.Errorf("error tracing transaction: %w", err)
 		}
 
-		traceCall := traceResults[0].Trace
-
 		count := 0
-		for _, call := range traceCall {
-			if call.Action.Create == nil {
-				continue
-			}
 
-			if call.Action.Create.From != address {
-				continue
+		for _, call := range result.Calls {
+			if call.Type == "CREATE" && call.From == address && call.To != nil {
+				count++
+				addresses = append(addresses, *call.To)
 			}
-
-			if call.Result.Address == nil {
-				continue
-			}
-
-			addresses = append(addresses, *call.Result.Address)
-			count++
 		}
 
 		if count == 0 {

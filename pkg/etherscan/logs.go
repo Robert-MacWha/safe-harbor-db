@@ -36,6 +36,13 @@ type logsAPIConfig struct {
 
 func (c logsAPIConfig) toQueryParams() url.Values {
 	query := c.blockApiConfig.toQueryParams()
+
+	// Since Logs API uses from and to block instead of start and end block
+	query.Del("startblock")
+	query.Set("fromBlock", fmt.Sprintf("%d", c.StartBlock))
+	query.Del("endblock")
+	query.Set("toBlock", "latest")
+
 	query.Set("topic0", c.Topic0)
 	return query
 }
