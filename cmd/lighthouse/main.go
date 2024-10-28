@@ -26,11 +26,8 @@ import (
 	"github.com/Skylock-ai/Arianrhod/pkg/types/web3"
 )
 
-// const updateRegistryInterval = 1 * time.Hour
-// const updateProtocolsInterval = 1 * time.Hour
-
-const updateRegistryInterval = 10 * time.Second
-const updateProtocolsInterval = 10 * time.Second
+const updateRegistryInterval = 1 * time.Hour
+const updateProtocolsInterval = 1 * time.Hour
 
 // RegistryConfig represents the structure of the registry data
 type RegistryConfig struct {

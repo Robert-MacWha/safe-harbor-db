@@ -84,8 +84,6 @@ func callEtherscanAPI(config basicConfig) ([]byte, error) {
 	baseURL := config.getBaseURL()
 	query := config.toQueryParams()
 
-	fmt.Println(fmt.Sprintf("%s?%s", baseURL, query.Encode()))
-
 	resp, err := http.Get(fmt.Sprintf("%s?%s", baseURL, query.Encode()))
 	if err != nil {
 		return nil, fmt.Errorf("failed to send request: %w", err)

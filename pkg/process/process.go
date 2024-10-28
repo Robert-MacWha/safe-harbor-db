@@ -5,6 +5,7 @@ import (
 	"SHDB/pkg/firewall"
 	"context"
 	"fmt"
+	"log"
 
 	"github.com/Skylock-ai/Arianrhod/pkg/types/web3"
 	"github.com/ethereum/go-ethereum/rpc"
@@ -31,7 +32,7 @@ type debugResult struct {
 func GetNameOrEmpty(address web3.Address, chainID int64, apiKey string) string {
 	result, err := etherscan.FetchSourceCode(chainID, apiKey, address)
 	if err != nil {
-		fmt.Println("Failed to fetch source code", "error", err)
+		log.Println("Failed to fetch source code", "error", err)
 		return ""
 	}
 
@@ -164,7 +165,7 @@ func GetAllSubContractAddresses(
 		// Perform the RPC call to debug_traceTransaction
 		err = rpcClient.CallContext(context.Background(), &result, "debug_traceTransaction", txHash.String(), params)
 		if err != nil {
-			fmt.Println("Failed to trace transaction", "error", err)
+			log.Println("Failed to trace transaction", "error", err)
 			return nil, fmt.Errorf("error tracing transaction: %w", err)
 		}
 

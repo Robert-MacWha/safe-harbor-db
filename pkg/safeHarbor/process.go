@@ -3,7 +3,7 @@ package safeharbor
 import (
 	"SHDB/pkg/process"
 	"context"
-	"fmt"
+	"log"
 	"strconv"
 
 	"github.com/Skylock-ai/Arianrhod/pkg/types/web3"
@@ -26,33 +26,33 @@ func ProcessSafeHarborAgreement(
 	for _, chain := range safeHarbor.Chains {
 		chainIdInt, err := strconv.Atoi(chain.ID)
 		if err != nil {
-			fmt.Println("Failed to parse chain ID", "error", err)
+			log.Println("Failed to parse chain ID", "error", err)
 			continue
 		}
 
 		chainId := int64(chainIdInt)
 
 		if _, exists := chainConfigs[chainId]; !exists {
-			fmt.Println("Chain ID not found in chainConfigs", "chainID", chain.ID)
+			log.Println("Chain ID not found in chainConfigs", "chainID", chain.ID)
 			continue
 		}
 		chainConfig := chainConfigs[chainId]
 
 		rpcClient, err := rpc.Dial(chainConfig.RPCURL)
 		if err != nil {
-			fmt.Println("Failed to connect to the RPC client", "error", err)
+			log.Println("Failed to connect to the RPC client", "error", err)
 			continue
 		}
 
 		ethClient, err := ethclient.Dial(chainConfig.RPCURL)
 		if err != nil {
-			fmt.Println("Failed to connect to the Ethereum client", "error", err)
+			log.Println("Failed to connect to the Ethereum client", "error", err)
 			continue
 		}
 
 		latestBlock, err := ethClient.BlockNumber(context.Background())
 		if err != nil {
-			fmt.Println("Failed to get the latest block number", "error", err)
+			log.Println("Failed to get the latest block number", "error", err)
 			continue
 		}
 
@@ -62,7 +62,7 @@ func ProcessSafeHarborAgreement(
 		for i := range chain.Accounts {
 			web3Address, err := web3.HexToAddress(chain.Accounts[i].Address)
 			if err != nil {
-				fmt.Println("Failed to parse address", "error", err)
+				log.Println("Failed to parse address", "error", err)
 				return nil, err
 			}
 
@@ -77,7 +77,7 @@ func ProcessSafeHarborAgreement(
 					startBlock,
 				)
 				if err != nil {
-					fmt.Println("Failed to get child contract addresses", "error", err)
+					log.Println("Failed to get child contract addresses", "error", err)
 					return nil, err
 				}
 
