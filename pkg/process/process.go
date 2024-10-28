@@ -162,7 +162,7 @@ func GetAllSubContractAddresses(
 
 		var result debugResult
 		// Perform the RPC call to debug_traceTransaction
-		err = rpcClient.CallContext(context.Background(), &result, "debug_traceTransaction", txHash, params)
+		err = rpcClient.CallContext(context.Background(), &result, "debug_traceTransaction", txHash.String(), params)
 		if err != nil {
 			fmt.Println("Failed to trace transaction", "error", err)
 			return nil, fmt.Errorf("error tracing transaction: %w", err)
@@ -170,7 +170,7 @@ func GetAllSubContractAddresses(
 
 		count := 0
 
-		for _, call := range result.Calls {
+		for _, call := range result.AllCalls() {
 			if call.Type == "CREATE" && call.From == address && call.To != nil {
 				count++
 				addresses = append(addresses, *call.To)
@@ -193,4 +193,27 @@ func GetAllSubContractAddresses(
 	}
 
 	return addresses, nil
+}
+
+// AllCalls returns a depth-first list of all calls, including nested subcalls, for Result
+func (r *debugResult) AllCalls() []call {
+	var result []call
+
+	// Helper function to perform depth-first traversal
+	var collectCalls func(call call)
+	collectCalls = func(call call) {
+		result = append(result, call) // Add the current call to the list
+
+		// Recursively collect sub-calls
+		for _, subCall := range call.Calls {
+			collectCalls(subCall)
+		}
+	}
+
+	// Start the collection for all top-level calls in Result
+	for _, topCall := range r.Calls {
+		collectCalls(topCall)
+	}
+
+	return result
 }
