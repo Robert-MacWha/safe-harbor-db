@@ -30,9 +30,14 @@ import (
 const updateRegistryInterval = 10 * time.Second
 const updateProtocolsInterval = 10 * time.Second
 
+// RegistryConfig represents the structure of the registry data
 type RegistryConfig struct {
-	ChainID         int64  `json:"chainId"`
-	RegistryAddress string `json:"registryAddress"`
+	CommitHash string `json:"commitHash"`
+	Registries []struct {
+		Address string `json:"address"`
+		ChainID int64  `json:"chainID"`
+	} `json:"registries"`
+	Version string `json:"version"`
 }
 
 type EtherscanEvent struct {
@@ -48,12 +53,6 @@ func main() {
 		Name:  "safe-harbor-monitor",
 		Usage: "Monitors Safe Harbor registry addresses for new agreements",
 		Flags: []cli.Flag{
-			&cli.StringFlag{
-				Name:     "config",
-				Aliases:  []string{"c"},
-				Usage:    "Path to the registry config JSON file",
-				Required: true,
-			},
 			&cli.StringFlag{
 				Name:     "chainConfigs",
 				Aliases:  []string{"cc"},
@@ -76,11 +75,6 @@ func main() {
 }
 
 func Run(c *cli.Context) error {
-	registryConfigs, err := loadRegistryConfigs(c.String("config"))
-	if err != nil {
-		return fmt.Errorf("failed to load registry configs: %w", err)
-	}
-
 	chainConfigs, err := loadChainConfigs(c.String("chainConfigs"))
 	if err != nil {
 		return fmt.Errorf("failed to load chain configs: %w", err)
@@ -95,33 +89,38 @@ func Run(c *cli.Context) error {
 	}
 	defer firestoreClient.Close()
 
-	var wg sync.WaitGroup
-
-	for _, registryConfig := range registryConfigs {
-		wg.Add(1)
-		go func(rc RegistryConfig) {
-			defer wg.Done()
-			err := monitorRegistry(rc, chainConfigs, firestoreClient)
-			if err != nil {
-				log.Printf("Error monitoring registry for ChainID %d: %v", rc.ChainID, err)
-			}
-		}(registryConfig)
+	registryConfig, err := loadRegistryConfigFromFirestore(firestoreClient)
+	if err != nil {
+		return fmt.Errorf("failed to load registry configs: %w", err)
 	}
 
-	// go monitorSafeHarborProtocols(firestoreClient, chainConfigs)
+	var wg sync.WaitGroup
+
+	for _, registryConfig := range registryConfig.Registries {
+		wg.Add(1)
+		go func(chainID int64, registryAddress string) {
+			defer wg.Done()
+			err := monitorRegistry(chainID, registryAddress, chainConfigs, firestoreClient)
+			if err != nil {
+				log.Printf("Error monitoring registry for ChainID %d: %v", chainID, err)
+			}
+		}(registryConfig.ChainID, registryConfig.Address)
+	}
+
+	go monitorSafeHarborProtocols(firestoreClient, chainConfigs)
 
 	wg.Wait()
 	return nil
 }
 
 func monitorRegistry(
-	registryConfig RegistryConfig,
+	chainID int64,
+	registryAddress string,
 	chainConfigs map[int64]safeharbor.ChainConfig,
 	firestoreClient *firestore.Client,
 ) error {
-	chainID := registryConfig.ChainID
 	apiKey := chainConfigs[chainID].APIKey
-	address, err := web3.HexToAddress(registryConfig.RegistryAddress)
+	address, err := web3.HexToAddress(registryAddress)
 	if err != nil {
 		return fmt.Errorf("invalid registry address: %w", err)
 	}
@@ -129,10 +128,10 @@ func monitorRegistry(
 	// Initialize last processed block number
 	var lastProcessedBlock int64 = 0
 
-	log.Printf("Monitoring ChainID: %d, RegistryAddress: %s", chainID, registryConfig.RegistryAddress)
+	log.Printf("Monitoring ChainID: %d, RegistryAddress: %s", chainID, registryAddress)
 
 	for {
-		lastProcessedBlock, err = processEvents(registryConfig, chainConfigs, firestoreClient, apiKey, address, lastProcessedBlock)
+		lastProcessedBlock, err = processEvents(chainID, chainConfigs, firestoreClient, apiKey, address, lastProcessedBlock)
 		if err != nil {
 			log.Printf("Error processing events for ChainID %d: %v", chainID, err)
 		}
@@ -142,15 +141,13 @@ func monitorRegistry(
 }
 
 func processEvents(
-	registryConfig RegistryConfig,
+	chainID int64,
 	chainConfigs map[int64]safeharbor.ChainConfig,
 	firestoreClient *firestore.Client,
 	apiKey string,
 	address *web3.Address,
 	lastProcessedBlock int64,
 ) (int64, error) {
-	chainID := registryConfig.ChainID
-
 	// Fetch events from Etherscan starting from the last processed block
 	events, err := fetchEventsFromEtherscan(chainID, apiKey, *address, lastProcessedBlock)
 	if err != nil {
@@ -320,21 +317,6 @@ func checkExistingAgreement(firestoreClient *firestore.Client, eoa string) (bool
 	return true, int64(createdAt.Unix()), nil
 }
 
-func loadRegistryConfigs(filePath string) ([]RegistryConfig, error) {
-	data, err := os.ReadFile(filePath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read registry config file: %w", err)
-	}
-
-	var registryConfigs []RegistryConfig
-	err = json.Unmarshal(data, &registryConfigs)
-	if err != nil {
-		return nil, fmt.Errorf("failed to unmarshal registry config JSON: %w", err)
-	}
-
-	return registryConfigs, nil
-}
-
 func loadChainConfigs(filePath string) (map[int64]safeharbor.ChainConfig, error) {
 	data, err := os.ReadFile(filePath)
 	if err != nil {
@@ -348,6 +330,26 @@ func loadChainConfigs(filePath string) (map[int64]safeharbor.ChainConfig, error)
 	}
 
 	return chainConfigs, nil
+}
+
+// loadRegistryConfigFromFirestore fetches a single registry config from Firestore
+func loadRegistryConfigFromFirestore(client *firestore.Client) (RegistryConfig, error) {
+	ctx := context.Background()
+
+	// Get the document by its ID in the "registries" collection
+	docRef := client.Collection("registries").Doc("977TQDEJbjykCRzqVnNZ")
+	docSnap, err := docRef.Get(ctx)
+	if err != nil {
+		return RegistryConfig{}, fmt.Errorf("failed to get document: %w", err)
+	}
+
+	// Unmarshal the document data into a RegistryConfig struct
+	var config RegistryConfig
+	if err := docSnap.DataTo(&config); err != nil {
+		return RegistryConfig{}, fmt.Errorf("failed to unmarshal document data: %w", err)
+	}
+
+	return config, nil
 }
 
 func newFirestoreClient(credsPath string) (*firestore.Client, error) {

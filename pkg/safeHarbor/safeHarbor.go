@@ -19,6 +19,7 @@ type SafeHarborAgreement struct {
 	Protocol            *firestore.DocumentRef `firestore:"protocol"`            // Reference to Protocol document
 	RegistryTransaction string                 `firestore:"registryTransaction"` // Transaction hash
 	RegistryChainId     string                 `firestore:"registryChainId"`
+	AgreementAddress    string                 `firestore:"agreementAddress"`
 	Entity              string                 `firestore:"entity"` // Creator EOA
 	AgreementURI        string                 `firestore:"agreementURI"`
 	ContactDetails      string                 `firestore:"contactDetails"`

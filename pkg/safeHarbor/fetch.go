@@ -89,6 +89,7 @@ func FetchAgreementDetails(
 	agreementDetails := &SafeHarborAgreement{
 		RegistryTransaction: registryTransaction,
 		RegistryChainId:     registryChainId,
+		AgreementAddress:    safeHarborAddress.String(),
 		Entity:              entity,
 		AgreementURI:        result.AgreementDetails.AgreementURI,
 		ContactDetails:      formatContactDetails(result.AgreementDetails.ContactDetails),
