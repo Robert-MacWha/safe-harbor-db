@@ -18,6 +18,8 @@ import (
 
 	"cloud.google.com/go/firestore"
 	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/joho/godotenv"
+	"github.com/mailgun/mailgun-go/v4"
 	"github.com/urfave/cli/v2"
 	"google.golang.org/api/iterator"
 	"google.golang.org/api/option"
@@ -49,22 +51,9 @@ type EtherscanEvent struct {
 
 func main() {
 	app := &cli.App{
-		Name:  "safe-harbor-monitor",
-		Usage: "Monitors Safe Harbor registry addresses for new agreements",
-		Flags: []cli.Flag{
-			&cli.StringFlag{
-				Name:     "chainConfigs",
-				Aliases:  []string{"cc"},
-				Usage:    "Path to the chain configurations JSON file",
-				Required: true,
-			},
-			&cli.StringFlag{
-				Name:     "creds",
-				Aliases:  []string{"f"},
-				Usage:    "Path to Firestore credentials file",
-				Required: true,
-			},
-		},
+		Name:   "safe-harbor-monitor",
+		Usage:  "Monitors Safe Harbor registry addresses for new agreements",
+		Flags:  []cli.Flag{},
 		Action: Run,
 	}
 	err := app.Run(os.Args)
@@ -74,15 +63,18 @@ func main() {
 }
 
 func Run(c *cli.Context) error {
-	chainConfigs, err := loadChainConfigs(c.String("chainConfigs"))
+	err := godotenv.Load(".env")
+	if err != nil {
+		log.Printf("Failed to load .env file: %v", err)
+	}
+
+	chainConfigs, err := loadChainConfigs()
 	if err != nil {
 		return fmt.Errorf("failed to load chain configs: %w", err)
 	}
 
-	credsPath := c.String("creds")
-
 	// Create Firestore client
-	firestoreClient, err := newFirestoreClient(credsPath)
+	firestoreClient, err := newFirestoreClient()
 	if err != nil {
 		return fmt.Errorf("failed to create Firestore client: %w", err)
 	}
@@ -284,9 +276,9 @@ func processAgreementEvent(
 		return fmt.Errorf("failed to process Safe Harbor agreement: %w", err)
 	}
 
-	// TODO: Send an email notification
+	err = sendEmail()
 
-	return nil
+	return err
 }
 
 func checkExistingAgreement(firestoreClient *firestore.Client, eoa string) (bool, int64, error) {
@@ -314,14 +306,14 @@ func checkExistingAgreement(firestoreClient *firestore.Client, eoa string) (bool
 	return true, int64(createdAt.Unix()), nil
 }
 
-func loadChainConfigs(filePath string) (map[int64]safeharbor.ChainConfig, error) {
-	data, err := os.ReadFile(filePath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read chain config file: %w", err)
+func loadChainConfigs() (map[int64]safeharbor.ChainConfig, error) {
+	data := os.Getenv("CHAIN_CONFIG")
+	if data == "" {
+		return nil, fmt.Errorf("CHAIN_CONFIGS environment variable not set")
 	}
 
 	var chainConfigs map[int64]safeharbor.ChainConfig
-	err = json.Unmarshal(data, &chainConfigs)
+	err := json.Unmarshal([]byte(data), &chainConfigs)
 	if err != nil {
 		return nil, fmt.Errorf("failed to unmarshal chain config JSON: %w", err)
 	}
@@ -349,10 +341,16 @@ func loadRegistryConfigFromFirestore(client *firestore.Client) (RegistryConfig, 
 	return config, nil
 }
 
-func newFirestoreClient(credsPath string) (*firestore.Client, error) {
+func newFirestoreClient() (*firestore.Client, error) {
+	// Load from env
+	creds := os.Getenv("FIREBASE_CREDENTIALS")
+	if creds == "" {
+		return nil, fmt.Errorf("FIREBASE_CREDENTIALS environment variable not set")
+	}
+
 	ctx := context.Background()
 
-	client, err := firestore.NewClient(ctx, "skylock-xyz", option.WithCredentialsFile(credsPath))
+	client, err := firestore.NewClient(ctx, "skylock-xyz", option.WithCredentialsJSON([]byte(creds)))
 	if err != nil {
 		return nil, fmt.Errorf("firestore.NewClient: %w", err)
 	}
@@ -499,6 +497,37 @@ func fetchAndProcessProtocols(
 
 		log.Printf("Successfully processed and uploaded protocol '%s'", protocolSlug)
 	}
+
+	return nil
+}
+
+func sendEmail() error {
+	apiKey := os.Getenv("MAILGUN_API_KEY")
+	if apiKey == "" {
+		return fmt.Errorf("SENDGRID_API_KEY environment variable not set")
+	}
+
+	mg := mailgun.NewMailgun("sandbox8e9c6c34bc304b27a1f1c840e59a11b3.mailgun.org", apiKey)
+
+	sender := "mailgun@sandbox8e9c6c34bc304b27a1f1c840e59a11b3.mailgun.org"
+	subject := "Yo New Protocol"
+	body := "New Protocol plz check"
+	recipient := "dickson@skylock.xyz"
+
+	// The message object allows you to add attachments and Bcc recipients
+	message := mg.NewMessage(sender, subject, body, recipient)
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+	defer cancel()
+
+	// Send the message with a 10 second timeout
+	resp, id, err := mg.Send(ctx, message)
+
+	if err != nil {
+		return fmt.Errorf("Mailgun error: %v", err)
+	}
+
+	fmt.Println(resp, id)
 
 	return nil
 }
