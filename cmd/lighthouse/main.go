@@ -3,6 +3,7 @@ package main
 import (
 	"SHDB/pkg/etherscan"
 	"SHDB/pkg/flow"
+	"SHDB/pkg/protocol"
 	safeharbor "SHDB/pkg/safeHarbor"
 	"context"
 	"encoding/json"
@@ -11,6 +12,7 @@ import (
 	"math/big"
 	"os"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -255,19 +257,17 @@ func processAgreementEvent(
 	chainConfigs map[int64]safeharbor.ChainConfig,
 	firestoreClient *firestore.Client,
 ) error {
-	protocolID := event.Deployer.String() // Use the deployer address as protocolID
+	eoa := event.Deployer.String() // Use the deployer address as protocolID
 	blockNumber := big.NewInt(event.BlockNumber)
 
 	// Check if a newer agreement exists in Firestore
-	exists, existingBlockNumber, err := checkExistingAgreement(firestoreClient, protocolID)
+	exists, existingBlockNumber, err := checkExistingAgreement(firestoreClient, eoa)
 	if err != nil {
 		return fmt.Errorf("failed to check existing agreement: %w", err)
 	}
 
-	fmt.Println("YOOOOOOOOOOOOOOOOO", exists, existingBlockNumber, event.TimeStamp)
-
 	if exists && existingBlockNumber >= event.TimeStamp {
-		log.Printf("Skipping older or same agreement for deployer %s", protocolID)
+		log.Printf("Skipping older or same agreement for deployer %s", eoa)
 		return nil // Skip processing
 	}
 
@@ -279,7 +279,7 @@ func processAgreementEvent(
 		event.Deployer,
 		int(chainID),
 		blockNumber,
-		protocolID,
+		event.Deployer.String(), // Set protocolID to EOA
 		firestoreClient,
 		false, // setProtocol is false
 	)
@@ -377,6 +377,11 @@ func monitorSafeHarborProtocols(
 			log.Printf("Error fetching or processing agreements: %v", err)
 		}
 
+		err = fetchAndProcessProtocols(firestoreClient)
+		if err != nil {
+			log.Printf("Error fetching or processing protocols: %v", err)
+		}
+
 		time.Sleep(updateProtocolsInterval)
 	}
 }
@@ -441,6 +446,61 @@ func fetchAndProcessSafeHarborAgreements(
 
 			log.Printf("Successfully processed and updated agreement for chain %d", chainID)
 		}
+	}
+
+	return nil
+}
+
+// fetchAndProcessProtocols retrieves all protocols from Firestore, processes them, and uploads them back.
+func fetchAndProcessProtocols(
+	firestoreClient *firestore.Client,
+) error {
+	ctx := context.Background()
+	collection := firestoreClient.Collection("protocols")
+	iter := collection.Documents(ctx)
+	defer iter.Stop()
+
+	for {
+		doc, err := iter.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			return fmt.Errorf("error iterating Firestore documents: %w", err)
+		}
+
+		// Get the protocol name (assuming it's in a field called "name")
+		protocolName := doc.Data()["slug"].(string)
+		protocolSlug := strings.ToLower(protocolName)
+
+		// Fetch the protocol details
+		resultProtocol, err := protocol.GetProtocol(protocolSlug)
+		if err != nil {
+			log.Printf("Failed to get protocol '%s': %v", protocolName, err)
+			continue
+		}
+
+		// Upload the processed protocol back to Firestore
+		err = resultProtocol.Upload(firestoreClient, protocolSlug)
+		if err != nil {
+			log.Printf("Failed to upload protocol '%s' to Firestore: %v", protocolSlug, err)
+			continue
+		}
+
+		err = protocol.SetSafeHarborAgreement(firestoreClient, protocolSlug)
+		if err != nil {
+			log.Printf("Failed to set Safe Harbor Agreement for protocol '%s': %v", protocolSlug, err)
+			continue
+		}
+
+		// Set the protocol reference in Safe Harbor
+		err = safeharbor.SetProtocol(firestoreClient, protocolSlug)
+		if err != nil {
+			log.Printf("Failed to set protocol reference for Safe Harbor: %v", err)
+			continue
+		}
+
+		log.Printf("Successfully processed and uploaded protocol '%s'", protocolSlug)
 	}
 
 	return nil
