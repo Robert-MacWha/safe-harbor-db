@@ -11,8 +11,9 @@ import (
 	"math/big"
 	"os"
 
+	"SHDB/pkg/web3"
+
 	"cloud.google.com/go/firestore"
-	"github.com/Skylock-ai/Arianrhod/pkg/types/web3"
 	"github.com/urfave/cli/v2"
 	"google.golang.org/api/option"
 )

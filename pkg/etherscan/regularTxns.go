@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/Skylock-ai/Arianrhod/pkg/types/web3"
+	"SHDB/pkg/web3"
 )
 
 // RegularTransaction represents a regular transaction from the Etherscan API

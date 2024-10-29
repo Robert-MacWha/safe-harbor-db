@@ -9,8 +9,9 @@ import (
 	"SHDB/pkg/protocol"
 	safeharbor "SHDB/pkg/safeHarbor"
 
+	"SHDB/pkg/web3"
+
 	"cloud.google.com/go/firestore"
-	"github.com/Skylock-ai/Arianrhod/pkg/types/web3"
 	"github.com/ethereum/go-ethereum/ethclient"
 )
 

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"net/url"
 
-	"github.com/Skylock-ai/Arianrhod/pkg/types/web3"
+	"SHDB/pkg/web3"
 )
 
 // Log represents a log (event) from the Etherscan API

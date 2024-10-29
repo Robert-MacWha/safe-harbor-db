@@ -25,7 +25,7 @@ import (
 	"google.golang.org/api/option"
 
 	// Import necessary types
-	"github.com/Skylock-ai/Arianrhod/pkg/types/web3"
+	"SHDB/pkg/web3"
 )
 
 const updateRegistryInterval = 1 * time.Hour

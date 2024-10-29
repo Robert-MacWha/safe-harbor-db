@@ -3,8 +3,9 @@ package firewall
 import (
 	"time"
 
+	"SHDB/pkg/web3"
+
 	"cloud.google.com/go/firestore"
-	"github.com/Skylock-ai/Arianrhod/pkg/types/web3"
 )
 
 type ChildContractScope string
