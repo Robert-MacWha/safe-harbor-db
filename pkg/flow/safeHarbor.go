@@ -22,16 +22,23 @@ type ChainConfig struct {
 }
 
 // ProcessSafeHarborAgreement processes the Safe Harbor agreement, uploads it to Firestore, and optionally sets the protocol reference.
+//
+// Parameters:
+// - txHash: Safe Harbor Adoption transaction hash
+// - safeHarborAddress: Safe Harbor contract address
+// - deployer: Deployer address
+// - protocolID: Firestore Protocol ID. Must be unique and lowercase.
+// - setProtocol: Flag to update the reference in the protocol doc to this new safe harbor agreement.
 func ProcessSafeHarborAgreement(
-	chainConfigs map[int64]safeharbor.ChainConfig, // Chain configurations
-	txHash web3.Hash, // Ethereum transaction hash
-	safeHarborAddress web3.Address, // Safe Harbor contract address
-	deployer web3.Address, // Deployer address
-	chainId int, // Chain ID
-	blockNumber *big.Int, // Block number
-	protocolID string, // Firestore Protocol ID
-	firestoreClient *firestore.Client, // Firestore client
-	setProtocol bool, // Flag to set Safe Harbor agreement in protocol
+	chainConfigs map[int64]safeharbor.ChainConfig,
+	txHash web3.Hash,
+	safeHarborAddress web3.Address,
+	deployer web3.Address,
+	chainId int,
+	blockNumber *big.Int,
+	protocolID string,
+	firestoreClient *firestore.Client,
+	setProtocol bool,
 ) error {
 	// Step 1: Connect to Ethereum node using the RPC URL from the chain config
 	client, err := ethclient.Dial(chainConfigs[int64(chainId)].RPCURL)
@@ -55,19 +62,19 @@ func ProcessSafeHarborAgreement(
 	}
 
 	// Step 4: Upload the agreement to Firestore
-	protocolIDLower := strings.ToLower(protocolID)
-	err = agreement.Upload(firestoreClient, protocolIDLower)
+	protocolID = strings.ToLower(protocolID)
+	err = agreement.Upload(firestoreClient, protocolID)
 	if err != nil {
 		return fmt.Errorf("failed to upload agreement to Firestore: %w", err)
 	}
 
 	// Step 5 (optional): Set Safe Harbor Agreement reference in protocol
 	if setProtocol {
-		err = safeharbor.SetProtocol(firestoreClient, protocolIDLower)
+		err = safeharbor.SetProtocol(firestoreClient, protocolID)
 		if err != nil {
 			return fmt.Errorf("failed to set Safe Harbor Agreement reference: %w", err)
 		}
-		err = protocol.SetSafeHarborAgreement(firestoreClient, protocolIDLower)
+		err = protocol.SetSafeHarborAgreement(firestoreClient, protocolID)
 		if err != nil {
 			return fmt.Errorf("failed to set protocol reference: %w", err)
 		}

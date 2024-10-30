@@ -8,7 +8,7 @@ The Safe Harbor Monitor CLI tool continuously monitors blockchain events related
 
 Run the CLI tool. Have an env file with the following variables:
 
-- FIREBASE_CREDENTIALS: A string of the json of the Firebase Credentials (literally copy and paste the json)
+-   FIREBASE_CREDENTIALS: A string of the json of the Firebase Credentials (literally copy and paste the json)
 
 ```
 '{
@@ -26,7 +26,7 @@ Run the CLI tool. Have an env file with the following variables:
 }'
 ```
 
-- CHAIN_CONFIG: A dictionary of chainid, and APIKey & RPCURL for that chain
+-   CHAIN_CONFIG: A dictionary of chainid, and APIKey & RPCURL for that chain
 
 ```
 {
@@ -45,7 +45,7 @@ Run the CLI tool. Have an env file with the following variables:
 }
 ```
 
-- MAILGUN_API_KEY: The API key for Mailgun
+-   MAILGUN_API_KEY: The API key for Mailgun
 
 ## Example
 

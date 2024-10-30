@@ -261,6 +261,7 @@ func processAgreementEvent(
 	}
 
 	// Process the new agreement
+	protocolID := strings.ToLower(event.Deployer.String())
 	err = flow.ProcessSafeHarborAgreement(
 		chainConfigs,
 		event.TransactionHash,
@@ -268,7 +269,7 @@ func processAgreementEvent(
 		event.Deployer,
 		int(chainID),
 		blockNumber,
-		event.Deployer.String(), // Set protocolID to EOA
+		protocolID,
 		firestoreClient,
 		false, // setProtocol is false
 	)
@@ -276,7 +277,7 @@ func processAgreementEvent(
 		return fmt.Errorf("failed to process Safe Harbor agreement: %w", err)
 	}
 
-	err = sendEmail()
+	err = sendEmail(event, chainID, protocolID)
 
 	return err
 }
@@ -501,7 +502,7 @@ func fetchAndProcessProtocols(
 	return nil
 }
 
-func sendEmail() error {
+func sendEmail(event EtherscanEvent, chainID int64, protocolID string) error {
 	apiKey := os.Getenv("MAILGUN_API_KEY")
 	if apiKey == "" {
 		return fmt.Errorf("SENDGRID_API_KEY environment variable not set")
@@ -511,7 +512,13 @@ func sendEmail() error {
 
 	sender := "mailgun@sandbox8e9c6c34bc304b27a1f1c840e59a11b3.mailgun.org"
 	subject := "Yo New Protocol"
-	body := "New Protocol plz check"
+	body := fmt.Sprintf(
+		"New Protocol plz check\nChainID: %d \nTxHash: %s \nDeployer: %s \nProtocol ID: %s",
+		chainID,
+		event.TransactionHash.String(),
+		event.Deployer.String(),
+		protocolID,
+	)
 	recipient := "dickson@skylock.xyz"
 
 	// The message object allows you to add attachments and Bcc recipients
@@ -524,7 +531,7 @@ func sendEmail() error {
 	resp, id, err := mg.Send(ctx, message)
 
 	if err != nil {
-		return fmt.Errorf("Mailgun error: %v", err)
+		return fmt.Errorf("mailgun error: %v", err)
 	}
 
 	fmt.Println(resp, id)
