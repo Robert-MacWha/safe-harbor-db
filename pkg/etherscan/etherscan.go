@@ -17,6 +17,10 @@ var chainIDBaseURLs = map[int64]string{
 	42161:    "https://api.arbiscan.io/api",
 	8453:     "https://api.basescan.org/api",
 	10:       "https://api-optimistic.etherscan.io/api",
+	56:       "https://api.bscscan.com/api",
+	1101:     "https://api-zkevm.polygonscan.com/api",
+	43114:    "https://api.routescan.io/v2/network/mainnet/evm/43114/etherscan/api",
+	100:      "https://api.gnosisscan.io/api",
 }
 
 // baseConfig is an interface that's required for basic API calls
