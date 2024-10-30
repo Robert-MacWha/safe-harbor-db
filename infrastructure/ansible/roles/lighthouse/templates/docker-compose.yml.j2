@@ -1,0 +1,10 @@
+services:
+    lighthouse:
+        container_name: lighthouse_service
+        image: "ghcr.io/skylock-ai/lighthouse:main"
+        pull_policy: always
+        environment:
+            FIREBASE_CREDENTIALS: "{{ firebase_credentials }}"
+            CHAIN_CONFIG: "{{ chain_config }}"
+            MAILGUN_API_KEY: "{{ mailgun_api_key }}"
+        restart: unless-stopped

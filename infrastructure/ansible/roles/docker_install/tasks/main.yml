@@ -1,0 +1,28 @@
+---
+- name: Ensure old versions of Docker are not installed.
+  package:
+      name:
+          - docker
+          - docker.io
+          - docker-engine
+      state: absent
+
+- name: Ensure dependencies are installed.
+  apt:
+      name:
+          - apt-transport-https
+          - ca-certificates
+          - curl
+          - gnupg
+      state: latest
+      update_cache: yes
+
+- name: Add Docker's official GPG key
+  apt_key:
+      url: https://download.docker.com/linux/debian/gpg
+      state: present
+
+- name: Add Docker APT repository
+  apt_repository:
+      repo: "deb [arch={{ ansible_facts['architecture'] }} signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/debian {{ debian_codename }} stable"
+      state: present

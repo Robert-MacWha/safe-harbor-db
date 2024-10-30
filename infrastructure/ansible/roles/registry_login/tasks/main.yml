@@ -1,0 +1,6 @@
+---
+- name: Log into Github Registry
+  community.docker.docker_login:
+      registry_url: ghcr.io
+      username: "{{ docker_username }}"
+      password: "{{ docker_password }}"

@@ -1,0 +1,60 @@
+name: Deploy
+on:
+    workflow_dispatch:
+        inputs:
+            arianrhod_version:
+                description: "Arianrhod version to deploy"
+                required: true
+
+jobs:
+    deploy:
+        runs-on: ubuntu-latest
+
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
+
+            - name: Set up Python
+              uses: actions/setup-python@v5
+              with:
+                  python-version: "3.10"
+
+            - name: Install Python dependencies
+              run: |
+                  pip install boto3 botocore ansible
+
+            - name: Set up AWS credentials
+              run: |
+                  echo "AWS_ACCESS_KEY=${{ secrets.AWS_ACCESS_KEY_ID }}" >> $GITHUB_ENV
+                  echo "AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}" >> $GITHUB_ENV
+
+            - name: Set up Tailscale secret
+              run: |
+                  echo "TAILSCALE_CLIENT_SECRET=${{ secrets.TAILSCALE_CLIENT_SECRET }}" >> $GITHUB_ENV
+
+            - name: Install Tailscale
+              run: |
+                  curl -fsSL https://tailscale.com/install.sh | sh
+
+            - name: Authenticate and start Tailscale
+              run: |
+                  sudo tailscale up --authkey=${{ secrets.TAILSCALE_CLIENT_SECRET }} --hostname="workflow-deploy" --advertise-tags=tag:ansible --accept-routes
+
+            - name: Verify Tailscale connection
+              run: |
+                  ping -c 4 latitude.tailc5b0e.ts.net
+
+            - name: Disable SSH strict host key checking
+              run: |
+                  echo "ANSIBLE_HOST_KEY_CHECKING=False" >> $GITHUB_ENV
+
+            - name: Add SSH key
+              run: |
+                  mkdir -p ~/.ssh
+                  echo "${{ secrets.LATITUDE_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+                  chmod 600 ~/.ssh/id_rsa
+
+            - name: Run Ansible script
+              working-directory: ./infrastructure/ansible
+              run: |
+                  ansible-playbook -i inventory.ini arianrhod_private.yml --extra-vars "arianrhod_version=${{ github.event.inputs.arianrhod_version }}"
