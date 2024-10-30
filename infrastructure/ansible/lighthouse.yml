@@ -10,9 +10,9 @@
   roles:
       - role: aws_lighthouse_secret_load
         vars:
-          aws_region: "us-east-1"
-          aws_access_key: "{{ lookup('env', 'AWS_ACCESS_KEY') }}"
-          aws_secret_access_key: "{{ lookup('env', 'AWS_SECRET_ACCESS_KEY') }}"
+            aws_region: "us-east-1"
+            aws_access_key: "{{ lookup('env', 'AWS_ACCESS_KEY') }}"
+            aws_secret_access_key: "{{ lookup('env', 'AWS_SECRET_ACCESS_KEY') }}"
 
       - role: docker_install
         become: true
@@ -24,10 +24,10 @@
             docker_username: "{{ aws_secret.GITHUB_ACTOR }}"
             docker_password: "{{ aws_secret.GITHUB_TOKEN }}"
 
-    - role: lighthouse
-      vars:
-        firebase_credentials: "{{ aws_secret.LIGHTHOUSE_FIREBASE_CREDENTIALS }}"
-        chain_config: "{{ aws_secret.LIGHTHOUSE_CHAIN_CONFIG }}"
-        mailgun_api_key: "{{ aws_secret.MAILGUN_API_KEY }}"
-        working_dir: "lighthouse"
-        version: "{{ lighthouse_version }}"
+      - role: lighthouse
+        vars:
+            firebase_credentials: "{{ aws_secret.LIGHTHOUSE_FIREBASE_CREDENTIALS }}"
+            chain_config: "{{ aws_secret.LIGHTHOUSE_CHAIN_CONFIG }}"
+            mailgun_api_key: "{{ aws_secret.MAILGUN_API_KEY }}"
+            working_dir: "lighthouse"
+            version: "{{ lighthouse_version }}"
