@@ -38,7 +38,7 @@ jobs:
 
             - name: Authenticate and start Tailscale
               run: |
-                  sudo tailscale up --authkey=${{ secrets.TAILSCALE_CLIENT_SECRET }} --hostname="workflow-deploy" --advertise-tags=tag:ansible --accept-routes
+                  sudo tailscale up --authkey=${{ secrets.TAILSCALE_CLIENT_SECRET }} --hostname="shdb-workflow-deploy" --advertise-tags=tag:ansible --accept-routes
 
             - name: Verify Tailscale connection
               run: |
