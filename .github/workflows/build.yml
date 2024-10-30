@@ -6,8 +6,8 @@ on:
 
 env:
     REGISTRY: ghcr.io
-    REGISTRY_PATH: ghcr.io/skylock-ai/arianrhod
-    IMAGE_NAME: arianrhod
+    REGISTRY_PATH: ghcr.io/skylock-ai/lighthouse
+    IMAGE_NAME: lighthouse
 
 jobs:
     build:
