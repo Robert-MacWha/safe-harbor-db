@@ -1,8 +1,0 @@
-version: "3.9"
-services:
-  lighthouse:
-    build: .
-    container_name: lighthouse_service
-    env_file:
-      - .env # Load environment variables from the .env file
-    restart: unless-stopped # Ensures the container restarts if it fails

@@ -1,0 +1,32 @@
+---
+- name: Setup Lighthouse
+  hosts: private
+  vars_prompt:
+      - name: lighthouse_version
+        prompt: "Lighthouse version"
+        private: no
+  vars:
+      home_hostname: "homeserver"
+  roles:
+      - role: aws_lighthouse_secret_load
+      vars:
+        aws_region: "us-east-1"
+        aws_access_key: "{{ lookup('env', 'AWS_ACCESS_KEY') }}"
+        aws_secret_access_key: "{{ lookup('env', 'AWS_SECRET_ACCESS_KEY') }}"
+
+      - role: docker_install
+        become: true
+        vars:
+            debian_codename: "bookworm"
+
+      - role: registry_login
+        vars:
+            docker_username: "{{ aws_secret.GITHUB_ACTOR }}"
+            docker_password: "{{ aws_secret.GITHUB_TOKEN }}"
+
+    - role: lighthouse
+      vars:
+        firebase_credentials: "{{ aws_secret.LIGHTHOUSE_FIREBASE_CREDENTIALS }}"
+        chain_config: "{{ aws_secret.LIGHTHOUSE_CHAIN_CONFIG }}"
+        mailgun_api_key: "{{ aws_secret.MAILGUN_API_KEY }}"
+        working_dir: "lighthouse"
