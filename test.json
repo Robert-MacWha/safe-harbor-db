@@ -1,0 +1,42 @@
+{
+    "1": {
+        "APIKey": "PVZZQKUUE28APGKU9T41FD45P8BQ8M4JV3",
+        "RPCURL": "https://floral-wandering-telescope.quiknode.pro/3dab78094f801284adcf7ebf710a1f2bcf73bb42"
+    },
+    "56": {
+        "APIKey": "8RGWZ95XBHGJB2824TJ1EF76HTQ73TAX2D",
+        "RPCURL": "https://polished-radial-telescope.bsc.quiknode.pro/d7bb25feec83596bb5ad89c8326887908a014637"
+    },
+    "137": {
+        "APIKey": "2UYYF5VKP189UKN33F57UAFWPW7Q658GNB",
+        "RPCURL": "https://wandering-warmhearted-glade.matic.quiknode.pro/052abdbd5b5edfa400f9bed3ff2d14501d31759f"
+    },
+    "17000": {
+        "APIKey": "PVZZQKUUE28APGKU9T41FD45P8BQ8M4JV3",
+        "RPCURL": "https://frequent-sleek-frost.ethereum-holesky.quiknode.pro/43e48929064f5df35ecab07516a344defb2e0e69"
+    },
+    "42161": {
+        "APIKey": "VGTZIH8YQSJX9GFFVEVZ9D99C6AC1V9JIG",
+        "RPCURL": "https://delicate-thrilling-wish.arbitrum-mainnet.quiknode.pro/b7df77b13beff41d4cd3d3f760e5afd78319a90a"
+    },
+    "43114": {
+        "APIKey": "JHZHWGP4K16SBMXX7FWGHXAU4576KMF921",
+        "RPCURL": "https://orbital-restless-dew.avalanche-mainnet.quiknode.pro/cc79220daf837a28eade05d306634a69fb0b44f3/ext/bc/C/rpc/"
+    },
+    "8453": {
+        "APIKey": "91XVE99TYCB4ZC2ET6VR1SFFU1HCAXDR1I",
+        "RPCURL": "https://lively-bitter-seed.base-mainnet.quiknode.pro/5793156a42ab4b30ab0ea164e31ccca1928c0ef1"
+    },
+    "10": {
+        "APIKey": "TIHX6FD3Z41X8F1A2YMCV9UHZYTN2EZVPW",
+        "RPCURL": "https://cosmological-wandering-silence.optimism.quiknode.pro/bfcc3a9d48f69b475ccd90a91748c8d2ebf632ed"
+    },
+    "1101": {
+        "APIKey": "Z1G6H716MRG8XUU3D64BE9CU6CNGN8H4GU",
+        "RPCURL": "https://compatible-blue-season.zkevm-mainnet.quiknode.pro/2876a81a4155cfb9c42cebed83a3e9143f643653"
+    },
+    "100": {
+        "APIKey": "MFBVUZ1JVGNJ8IYFUA73GV85TSC2XKZRI6",
+        "RPCURL": "https://responsive-solemn-waterfall.xdai.quiknode.pro/0a3685632b23fce0c86c421fa10719dcac5721b3"
+    }
+}

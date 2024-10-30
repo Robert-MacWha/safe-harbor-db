@@ -4,7 +4,9 @@ services:
         image: "ghcr.io/skylock-ai/lighthouse:{{ version }}"
         pull_policy: always
         environment:
-            FIREBASE_CREDENTIALS: "{{ firebase_credentials }}"
-            CHAIN_CONFIG: "{{ chain_config }}"
-            MAILGUN_API_KEY: "{{ mailgun_api_key }}"
+            FIREBASE_CREDENTIALS: |
+                {{ firebase_credentials }}
+            CHAIN_CONFIG: |
+                {{ chain_config }}"
+            MAILGUN_API_KEY: {{ mailgun_api_key }}"
         restart: unless-stopped
