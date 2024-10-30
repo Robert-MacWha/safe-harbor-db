@@ -1,7 +1,7 @@
 services:
     lighthouse:
         container_name: lighthouse_service
-        image: "ghcr.io/skylock-ai/lighthouse:main"
+        image: "ghcr.io/skylock-ai/lighthouse:{{ version }}"
         pull_policy: always
         environment:
             FIREBASE_CREDENTIALS: "{{ firebase_credentials }}"

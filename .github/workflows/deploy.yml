@@ -2,8 +2,8 @@ name: Deploy
 on:
     workflow_dispatch:
         inputs:
-            arianrhod_version:
-                description: "Arianrhod version to deploy"
+            lighthouse_version:
+                description: "Lighthouse version to deploy"
                 required: true
 
 jobs:
@@ -57,4 +57,4 @@ jobs:
             - name: Run Ansible script
               working-directory: ./infrastructure/ansible
               run: |
-                  ansible-playbook -i inventory.ini arianrhod_private.yml --extra-vars "arianrhod_version=${{ github.event.inputs.arianrhod_version }}"
+                  ansible-playbook -i inventory.ini lighthouse.yml --extra-vars "lighthouse_version=${{ github.event.inputs.lighthouse_version }}"
