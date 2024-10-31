@@ -7,6 +7,6 @@ services:
             FIREBASE_CREDENTIALS: |
                 {{ firebase_credentials | to_json  }}
             CHAIN_CONFIG: |
-                {{ chain_config | to_json  }}"
-            MAILGUN_API_KEY: {{ mailgun_api_key }}"
+                {{ chain_config | to_json  }}
+            MAILGUN_API_KEY: "{{ mailgun_api_key }}"
         restart: unless-stopped
