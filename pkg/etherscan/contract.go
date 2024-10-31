@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
-	"time"
 
 	"SHDB/pkg/web3"
 )
@@ -85,8 +84,6 @@ func FetchSourceCode(
 	if err != nil {
 		return nil, fmt.Errorf("error calling Etherscan API: %w", err)
 	}
-
-	time.Sleep(200 * time.Millisecond)
 
 	return processGetSourceCode(responseBytes)
 }

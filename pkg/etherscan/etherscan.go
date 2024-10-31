@@ -99,6 +99,10 @@ func callEtherscanAPI(config basicConfig) ([]byte, error) {
 		return nil, fmt.Errorf("failed to read response: %w", err)
 	}
 
+	// 300 miliseconds because etherscan max rate is 5 requests per second
+	// 200 miliseconds has bit me in the ass before so I'm playing it safe
+	time.Sleep(300 * time.Millisecond)
+
 	return responseBytes, nil
 }
 
@@ -131,9 +135,6 @@ func fetchAllData[T any](
 			break
 		}
 		fromBlock = newLastBlock + 1
-
-		// 200 miliseconds because etherscan max rate is 5 requests per second
-		time.Sleep(1000 * time.Millisecond) //nolint
 	}
 
 	return allResults, nil
