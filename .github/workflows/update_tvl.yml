@@ -24,7 +24,7 @@ jobs:
               with:
                   secret-ids: |
                       lighthouse
-                  parse-json-secrets: true
+                  parse-json-secrets: false
 
             - name: Checkout code
               uses: actions/checkout@v4
