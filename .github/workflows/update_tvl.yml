@@ -1,0 +1,7 @@
+name: update_tvl
+
+jobs:
+    check-bats-version:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
