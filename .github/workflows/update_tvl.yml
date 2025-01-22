@@ -9,6 +9,8 @@ on:
 jobs:
     update_tvl:
         runs-on: ubuntu-latest
+        name: Update TVL ${{ github.event.inputs.slug }}
+
         steps:
             - name: Configure AWS Credentials
               uses: aws-actions/configure-aws-credentials@v4
