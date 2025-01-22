@@ -20,7 +20,8 @@ jobs:
             - name: Fetch AWS Lighthouse Secrets
               uses: aws-actions/aws-secretsmanager-get-secrets@v2
               with:
-                  secret-ids: ,lighthouse
+                  secret-ids: |
+                      ,lighthouse
                   parse-json-secrets: true
 
             - name: Checkout code
