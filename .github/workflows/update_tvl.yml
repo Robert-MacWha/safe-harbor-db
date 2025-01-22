@@ -1,5 +1,6 @@
 name: update_tvl
 
+on: [push]
 jobs:
     check-bats-version:
         runs-on: ubuntu-latest
