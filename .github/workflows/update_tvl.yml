@@ -28,8 +28,8 @@ jobs:
 
             - name: Parse and export secrets
               run: |
-                  echo "FIREBASE_CREDENTIALS=$(echo '${{ steps.secrets.outputs.lighthouse }}' | jq -r '.FIREBASE_CREDENTIALS')" >> $GITHUB_ENV
-                  echo "CHAIN_CONFIG=$(echo '${{ steps.secrets.outputs.lighthouse }}' | jq -r '.CHAIN_CONFIG')" >> $GITHUB_ENV
+                  echo "FIREBASE_CREDENTIALS=$(echo \"$LIGHTHOUSE\" | jq -r '.FIREBASE_CREDENTIALS')" >> $GITHUB_ENV
+                  echo "CHAIN_CONFIG=$(echo \"$LIGHTHOUSE\" | jq -r '.CHAIN_CONFIG')" >> $GITHUB_ENV
 
             - name: Checkout code
               uses: actions/checkout@v4
