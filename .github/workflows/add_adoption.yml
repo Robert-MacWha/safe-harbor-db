@@ -1,6 +1,6 @@
 name: add_adoption
 
-on: [push]
+on: workflow_dispatch
 jobs:
     check-bats-version:
         runs-on: ubuntu-latest
