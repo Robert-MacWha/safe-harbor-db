@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
 )
 
 type ChainCfg struct {
@@ -32,6 +33,8 @@ func LoadChainCfg() (map[int]ChainCfg, error) {
 	if chainCfgStr == "" {
 		return nil, fmt.Errorf("missing CHAIN_CONFIG env")
 	}
+
+	chainCfgStr = strings.Trim(chainCfgStr, "'")
 
 	var chainCfg map[int]ChainCfg
 	err := json.Unmarshal([]byte(chainCfgStr), &chainCfg)

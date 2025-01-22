@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 
 	"cloud.google.com/go/firestore"
 	"google.golang.org/api/option"
@@ -18,6 +19,7 @@ func NewFirestoreClient() (*firestore.Client, error) {
 	}
 
 	ctx := context.Background()
+	creds = strings.Trim(creds, "'")
 	client, err := firestore.NewClient(ctx, "skylock-xyz", option.WithCredentialsJSON([]byte(creds)))
 	if err != nil {
 		return nil, fmt.Errorf("firestore.NewClient: %w", err)
