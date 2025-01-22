@@ -26,6 +26,11 @@ jobs:
                       lighthouse
                   parse-json-secrets: false
 
+            - name: Parse and export secrets
+              run: |
+                  echo "FIREBASE_CREDENTIALS=$(echo '${{ steps.secrets.outputs.lighthouse }}' | jq -r '.FIREBASE_CREDENTIALS')" >> $GITHUB_ENV
+                  echo "CHAIN_CONFIG=$(echo '${{ steps.secrets.outputs.lighthouse }}' | jq -r '.CHAIN_CONFIG')" >> $GITHUB_ENV
+
             - name: Checkout code
               uses: actions/checkout@v4
 
@@ -42,6 +47,6 @@ jobs:
 
             - name: Run the program
               env:
-                  FIREBASE_CREDENTIALS: ${{ env.LIGHTHOUSE_FIREBASE_CREDENTIALS }}
-                  CHAIN_CONFIG: ${{ env.LIGHTHOUSE_CHAIN_CONFIG }}
+                  FIREBASE_CREDENTIALS: ${{ env.FIREBASE_CREDENTIALS }}
+                  CHAIN_CONFIG: ${{ env.CHAIN_CONFIG }}
               run: ./main refresh-tvl --slug=${{ github.event.inputs.slug }}
