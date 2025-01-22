@@ -24,12 +24,7 @@ jobs:
               with:
                   secret-ids: |
                       lighthouse
-                  parse-json-secrets: false
-
-            - name: Parse and export secrets
-              run: |
-                  echo "FIREBASE_CREDENTIALS=$(echo \"$LIGHTHOUSE\" | jq -r '.FIREBASE_CREDENTIALS')" >> $GITHUB_ENV
-                  echo "CHAIN_CONFIG=$(echo \"$LIGHTHOUSE\" | jq -r '.CHAIN_CONFIG')" >> $GITHUB_ENV
+                  parse-json-secrets: true
 
             - name: Checkout code
               uses: actions/checkout@v4
