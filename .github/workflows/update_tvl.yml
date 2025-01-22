@@ -1,4 +1,4 @@
-name: Update TVL
+name: update_tvl
 on:
     workflow_dispatch:
         inputs:
