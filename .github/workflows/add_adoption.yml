@@ -1,0 +1,55 @@
+name: add_adoption
+on:
+    workflow_dispatch:
+        inputs:
+            slug:
+                description: "Project defiliama slug"
+                required: true
+            chain:
+                description: "Adoption chain"
+                required: true
+            txhash:
+                description: "Adoption transaction hash"
+                required: true
+            proposalUri:
+                description: "Adoption proposal uri"
+
+jobs:
+    update_tvl:
+        runs-on: ubuntu-latest
+        name: "Add Adoption: ${{ github.event.inputs.slug }}"
+
+        steps:
+            - name: Configure AWS Credentials
+              uses: aws-actions/configure-aws-credentials@v4
+              with:
+                  aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+                  aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+                  aws-region: us-east-1
+
+            - name: Fetch AWS Lighthouse Secrets
+              uses: aws-actions/aws-secretsmanager-get-secrets@v2
+              with:
+                  secret-ids: |
+                      lighthouse
+                  parse-json-secrets: true
+
+            - name: Checkout code
+              uses: actions/checkout@v4
+
+            - name: Install golang
+              uses: actions/setup-go@v5
+              with:
+                  go-version: 1.22.3
+
+            - name: install dependencies
+              run: go mod download
+
+            - name: Build the program
+              run: go build -o main cmd/main/main.go
+
+            - name: Run the program
+              env:
+                  FIREBASE_CREDENTIALS: ${{ env.LIGHTHOUSE_FIREBASE_CREDENTIALS }}
+                  CHAIN_CONFIG: ${{ env.LIGHTHOUSE_CHAIN_CONFIG }}
+              run: ./main add-adoption --slug ${{ github.event.inputs.slug }} --chain ${{ github.event.inputs.chain }} --txhash ${{ github.event.inputs.txhash }} --proposal-uri ${{ github.event.inputs.proposalUri }}
