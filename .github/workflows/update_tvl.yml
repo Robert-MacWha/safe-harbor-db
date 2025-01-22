@@ -42,6 +42,6 @@ jobs:
 
             - name: Run the program
               env:
-                  FIREBASE_CREDENTIALS: ${{ env.FIREBASE_CREDENTIALS }}
-                  CHAIN_CONFIG: ${{ env.CHAIN_CONFIG }}
+                  FIREBASE_CREDENTIALS: ${{ env.LIGHTHOUSE_FIREBASE_CREDENTIALS }}
+                  CHAIN_CONFIG: ${{ env.LIGHTHOUSE_CHAIN_CONFIG }}
               run: ./main refresh-tvl --slug=${{ github.event.inputs.slug }}
