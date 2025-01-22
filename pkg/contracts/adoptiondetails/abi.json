@@ -1,0 +1,233 @@
+[
+    {
+        "inputs": [
+            {
+                "components": [
+                    {
+                        "internalType": "string",
+                        "name": "protocolName",
+                        "type": "string"
+                    },
+                    {
+                        "components": [
+                            {
+                                "internalType": "string",
+                                "name": "name",
+                                "type": "string"
+                            },
+                            {
+                                "internalType": "string",
+                                "name": "contact",
+                                "type": "string"
+                            }
+                        ],
+                        "internalType": "struct Contact[]",
+                        "name": "contactDetails",
+                        "type": "tuple[]"
+                    },
+                    {
+                        "components": [
+                            {
+                                "internalType": "address",
+                                "name": "assetRecoveryAddress",
+                                "type": "address"
+                            },
+                            {
+                                "components": [
+                                    {
+                                        "internalType": "address",
+                                        "name": "accountAddress",
+                                        "type": "address"
+                                    },
+                                    {
+                                        "internalType": "enum ChildContractScope",
+                                        "name": "childContractScope",
+                                        "type": "uint8"
+                                    },
+                                    {
+                                        "internalType": "bytes",
+                                        "name": "signature",
+                                        "type": "bytes"
+                                    }
+                                ],
+                                "internalType": "struct Account[]",
+                                "name": "accounts",
+                                "type": "tuple[]"
+                            },
+                            {
+                                "internalType": "uint256",
+                                "name": "id",
+                                "type": "uint256"
+                            }
+                        ],
+                        "internalType": "struct Chain[]",
+                        "name": "chains",
+                        "type": "tuple[]"
+                    },
+                    {
+                        "components": [
+                            {
+                                "internalType": "uint256",
+                                "name": "bountyPercentage",
+                                "type": "uint256"
+                            },
+                            {
+                                "internalType": "uint256",
+                                "name": "bountyCapUSD",
+                                "type": "uint256"
+                            },
+                            {
+                                "internalType": "bool",
+                                "name": "retainable",
+                                "type": "bool"
+                            },
+                            {
+                                "internalType": "enum IdentityRequirements",
+                                "name": "identity",
+                                "type": "uint8"
+                            },
+                            {
+                                "internalType": "string",
+                                "name": "diligenceRequirements",
+                                "type": "string"
+                            }
+                        ],
+                        "internalType": "struct BountyTerms",
+                        "name": "bountyTerms",
+                        "type": "tuple"
+                    },
+                    {
+                        "internalType": "string",
+                        "name": "agreementURI",
+                        "type": "string"
+                    }
+                ],
+                "internalType": "struct AgreementDetailsV1",
+                "name": "_details",
+                "type": "tuple"
+            }
+        ],
+        "stateMutability": "nonpayable",
+        "type": "constructor"
+    },
+    {
+        "inputs": [],
+        "name": "getDetails",
+        "outputs": [
+            {
+                "components": [
+                    {
+                        "internalType": "string",
+                        "name": "protocolName",
+                        "type": "string"
+                    },
+                    {
+                        "components": [
+                            {
+                                "internalType": "string",
+                                "name": "name",
+                                "type": "string"
+                            },
+                            {
+                                "internalType": "string",
+                                "name": "contact",
+                                "type": "string"
+                            }
+                        ],
+                        "internalType": "struct Contact[]",
+                        "name": "contactDetails",
+                        "type": "tuple[]"
+                    },
+                    {
+                        "components": [
+                            {
+                                "internalType": "address",
+                                "name": "assetRecoveryAddress",
+                                "type": "address"
+                            },
+                            {
+                                "components": [
+                                    {
+                                        "internalType": "address",
+                                        "name": "accountAddress",
+                                        "type": "address"
+                                    },
+                                    {
+                                        "internalType": "enum ChildContractScope",
+                                        "name": "childContractScope",
+                                        "type": "uint8"
+                                    },
+                                    {
+                                        "internalType": "bytes",
+                                        "name": "signature",
+                                        "type": "bytes"
+                                    }
+                                ],
+                                "internalType": "struct Account[]",
+                                "name": "accounts",
+                                "type": "tuple[]"
+                            },
+                            {
+                                "internalType": "uint256",
+                                "name": "id",
+                                "type": "uint256"
+                            }
+                        ],
+                        "internalType": "struct Chain[]",
+                        "name": "chains",
+                        "type": "tuple[]"
+                    },
+                    {
+                        "components": [
+                            {
+                                "internalType": "uint256",
+                                "name": "bountyPercentage",
+                                "type": "uint256"
+                            },
+                            {
+                                "internalType": "uint256",
+                                "name": "bountyCapUSD",
+                                "type": "uint256"
+                            },
+                            {
+                                "internalType": "bool",
+                                "name": "retainable",
+                                "type": "bool"
+                            },
+                            {
+                                "internalType": "enum IdentityRequirements",
+                                "name": "identity",
+                                "type": "uint8"
+                            },
+                            {
+                                "internalType": "string",
+                                "name": "diligenceRequirements",
+                                "type": "string"
+                            }
+                        ],
+                        "internalType": "struct BountyTerms",
+                        "name": "bountyTerms",
+                        "type": "tuple"
+                    },
+                    {
+                        "internalType": "string",
+                        "name": "agreementURI",
+                        "type": "string"
+                    }
+                ],
+                "internalType": "struct AgreementDetailsV1",
+                "name": "",
+                "type": "tuple"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [],
+        "name": "version",
+        "outputs": [{ "internalType": "string", "name": "", "type": "string" }],
+        "stateMutability": "pure",
+        "type": "function"
+    }
+]

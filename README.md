@@ -1,9 +1,8 @@
 # SHDB
 
-## TODO:
+## Adding private modules
 
--   [ ] Chain Config for API keys & RPC URIs
--   [ ] A way to update the document in Firestore
+To go get the arianrhod module, make sure your terminal is logged into github via ssh, then run `export GOPRIVATE=github.com/Skylock-ai`. From there you can run `go mod tidy` as normal.
 
 ## Infrastructure
 
