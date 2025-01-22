@@ -246,7 +246,7 @@ func addAdoption(eClient *ethclient.Client, fClient *firestore.Client, slug stri
 	}
 
 	exists := protocolDoc.Exists()
-	if !exists && !force {
+	if exists && !force {
 		return fmt.Errorf("protocol already exists in firestore. Use --force to overwrite")
 	}
 
