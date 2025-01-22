@@ -23,6 +23,8 @@ import (
 	"github.com/lmittmann/tint"
 	"github.com/nanmu42/etherscan-api"
 	"github.com/urfave/cli/v2"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 const EtherscanErrNoTxns string = "etherscan server: No transactions found"
@@ -239,7 +241,11 @@ func addAdoption(eClient *ethclient.Client, fClient *firestore.Client, slug stri
 	// Check if protocol exists
 	protocolDocRef := fClient.Collection(ProtocolsCollection).Doc(protocol.Slug)
 	protocolDoc, err := protocolDocRef.Get(context.Background())
-	exists := protocolDoc.Exists() || err != nil
+	if err != nil && status.Code(err) != codes.NotFound {
+		return fmt.Errorf("firestore.Get: %w", err)
+	}
+
+	exists := protocolDoc.Exists()
 	if !exists && !force {
 		return fmt.Errorf("protocol already exists in firestore. Use --force to overwrite")
 	}
