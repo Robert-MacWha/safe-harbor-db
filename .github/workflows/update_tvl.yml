@@ -37,11 +37,8 @@ jobs:
             - name: Install dependencies
               run: go mod download
 
-            - name: Build the program
-              run: go build -o main cmd/main/main.go
-
             - name: Run the program
               env:
                   FIREBASE_CREDENTIALS: ${{ env.LIGHTHOUSE_FIREBASE_CREDENTIALS }}
                   CHAIN_CONFIG: ${{ env.LIGHTHOUSE_CHAIN_CONFIG }}
-              run: ./main refresh-tvl --slug=${{ github.event.inputs.slug }}
+              run: go run ./cmd/main/main.go refresh-tvl --slug=${{ github.event.inputs.slug }}

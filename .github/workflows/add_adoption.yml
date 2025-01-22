@@ -45,16 +45,13 @@ jobs:
             - name: Install dependencies
               run: go mod download
 
-            - name: Build the program
-              run: go build -o main cmd/main/main.go
-
             - name: Run the program
               env:
                   FIREBASE_CREDENTIALS: ${{ env.LIGHTHOUSE_FIREBASE_CREDENTIALS }}
                   CHAIN_CONFIG: ${{ env.LIGHTHOUSE_CHAIN_CONFIG }}
               run: |
                   if [[ -n "${{ github.event.inputs.proposalUri }}" ]]; then
-                      ./main add-adoption --slug ${{ github.event.inputs.slug }} --chain ${{ github.event.inputs.chain }} --txhash ${{ github.event.inputs.txhash }} --proposal-uri "${{ github.event.inputs.proposalUri }}"
+                      go run ./cmd/main/main.go add-adoption --slug ${{ github.event.inputs.slug }} --chain ${{ github.event.inputs.chain }} --txhash ${{ github.event.inputs.txhash }} --proposal-uri "${{ github.event.inputs.proposalUri }}"
                   else
-                      ./main add-adoption --slug ${{ github.event.inputs.slug }} --chain ${{ github.event.inputs.chain }} --txhash ${{ github.event.inputs.txhash }}
+                      go run ./cmd/main/main.go add-adoption --slug ${{ github.event.inputs.slug }} --chain ${{ github.event.inputs.chain }} --txhash ${{ github.event.inputs.txhash }}
                   fi
