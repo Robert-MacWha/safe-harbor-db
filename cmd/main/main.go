@@ -178,7 +178,7 @@ func runRefreshTvl(cCtx *cli.Context) error {
 		slug := doc.Ref.ID
 		err = refreshTvl(fClient, slug)
 		if err != nil {
-			return fmt.Errorf("refreshTvl: %w", err)
+			slog.Warn("refreshTvl", "error", err)
 		}
 	}
 
@@ -217,7 +217,7 @@ func runRefreshChildContracts(cCtx *cli.Context) error {
 		slug := doc.Ref.ID
 		err = refreshChildContracts(fClient, slug, chainCfg)
 		if err != nil {
-			return fmt.Errorf("refreshTvl: %w", err)
+			slog.Warn("refreshChildContracts", "error", err)
 		}
 	}
 
@@ -248,7 +248,7 @@ func addAdoption(eClient *ethclient.Client, fClient *firestore.Client, slug stri
 	// Fetch defiliama data for protocol
 	protocol, err := defiliama.GetProtocol(slug)
 	if err != nil {
-		return fmt.Errorf("defiliama.GetProtocol: %w", err)
+		return fmt.Errorf("defiliama.GetProtocol(slug=%v): %w", slug, err)
 	}
 
 	//* Upload protocol & adoption to firestore if not already present
@@ -327,12 +327,11 @@ func refreshTvl(fClient *firestore.Client, slug string) error {
 	}
 
 	//* Fetch and update TVL
-	protocol, err := defiliama.GetProtocol(slug)
+	tvl, err := defiliama.GetTvl(slug)
 	if err != nil {
-		return fmt.Errorf("defiliama.GetProtocol: %w", err)
+		return fmt.Errorf("defiliama.GetProtocol(slug=%v): %w", slug, err)
 	}
 
-	tvl := protocol.TVL
 	data := map[string]interface{}{
 		"tvl": tvl,
 	}
@@ -342,7 +341,7 @@ func refreshTvl(fClient *firestore.Client, slug string) error {
 		return fmt.Errorf("firestore.Set: %w", err)
 	}
 
-	slog.Info("Successfully refreshed TVL")
+	slog.Info("Successfully refreshed TVL", "protocol", slug, "tvl", tvl)
 
 	return nil
 }
@@ -450,7 +449,7 @@ func refreshChildContracts(
 		return fmt.Errorf("firestore.Set: %w", err)
 	}
 
-	slog.Info("Successfully refreshed child contracts", "agreement", agreement.AgreementAddress, "total", totalChildren)
+	slog.Info("Successfully refreshed child contracts", "protocol", slug, "agreement", agreement.AgreementAddress, "total", totalChildren)
 
 	return nil
 }

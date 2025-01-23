@@ -32,6 +32,26 @@ type protocolCategory struct {
 	Category string `json:"category"`
 }
 
+func GetTvl(slug string) (float64, error) {
+	resp, err := http.Get(fmt.Sprintf("https://api.llama.fi/protocol/%s", slug))
+	if err != nil {
+		return 0, fmt.Errorf("http.Get: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return 0, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
+
+	var details protocolDetail
+	err = json.NewDecoder(resp.Body).Decode(&details)
+	if err != nil {
+		return 0, fmt.Errorf("json.Decode: %w", err)
+	}
+
+	return getLastTVL(details.TVL), nil
+}
+
 func GetProtocol(slug string) (Protocol, error) {
 	resp, err := http.Get(fmt.Sprintf("https://api.llama.fi/protocol/%s", slug))
 	if err != nil {
