@@ -375,7 +375,7 @@ func refreshChildContracts(
 		}
 
 		sClient := scan.NewRateLimitedClient(etherscan.NewCustomized(etherscan.Customization{
-			Timeout: 15 * time.Second,
+			Timeout: 20 * time.Second,
 			Key:     chainCfg[chain.ID].ScanKey,
 			BaseURL: chainCfg[chain.ID].ScanUrl,
 			Verbose: false,
@@ -500,7 +500,7 @@ func getAccountTxns(sClient scan.Client, accountAddr common.Address, startBlock 
 	// Fetch regular transactions
 	lastRegularIndexed := startBlock
 	for {
-		txns, err := sClient.NormalTxByAddress(accountAddr.String(), &lastRegularIndexed, endBlock, 0, 0, true)
+		normalTxns, err := sClient.NormalTxByAddress(accountAddr.String(), &lastRegularIndexed, endBlock, 0, 0, true)
 		if err != nil && err.Error() == EtherscanErrNoTxns {
 			break
 		}
@@ -510,7 +510,7 @@ func getAccountTxns(sClient scan.Client, accountAddr common.Address, startBlock 
 		}
 
 		updatedLastIndexed := false
-		for _, txn := range txns {
+		for _, txn := range normalTxns {
 			if _, exists := hashmap[txn.Hash]; exists {
 				continue
 			}
@@ -534,7 +534,7 @@ func getAccountTxns(sClient scan.Client, accountAddr common.Address, startBlock 
 	// Fetch internal transactions
 	lastInternalIndexed := startBlock
 	for {
-		txns, err := sClient.InternalTxByAddress(accountAddr.String(), &lastInternalIndexed, endBlock, 0, 0, true)
+		internalTxns, err := sClient.InternalTxByAddress(accountAddr.String(), &lastInternalIndexed, endBlock, 0, 0, true)
 		if err != nil && err.Error() == EtherscanErrNoTxns {
 			break
 		}
@@ -544,7 +544,7 @@ func getAccountTxns(sClient scan.Client, accountAddr common.Address, startBlock 
 		}
 
 		updatedLastIndexed := false
-		for _, txn := range txns {
+		for _, txn := range internalTxns {
 			if _, exists := hashmap[txn.Hash]; exists {
 				continue
 			}
