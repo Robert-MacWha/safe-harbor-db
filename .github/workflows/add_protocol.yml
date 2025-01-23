@@ -1,0 +1,8 @@
+name: add_protocol
+
+on: workflow_dispatch
+jobs:
+    check-bats-version:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
