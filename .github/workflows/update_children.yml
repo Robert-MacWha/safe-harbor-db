@@ -1,0 +1,62 @@
+name: update_children
+on:
+    workflow_dispatch:
+        inputs:
+            slug:
+                description: "Defiliama protocol slug. If 'all' refreshes all protocols"
+                required: true
+    schedule:
+        # Runs daily at 10:25 AM UTC (5:25 AM EST)
+        # Odd time used to avoid conflicts with other workflows
+        - cron: "25 10 * * *"
+
+jobs:
+    update_children:
+        runs-on: ubuntu-latest
+        name: "Update Children: ${{ github.event.inputs.slug | 'all' }}"
+
+        steps:
+            - name: Configure AWS Credentials
+              uses: aws-actions/configure-aws-credentials@v4
+              with:
+                  aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+                  aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+                  aws-region: us-east-1
+
+            - name: Fetch AWS Lighthouse Secrets
+              uses: aws-actions/aws-secretsmanager-get-secrets@v2
+              with:
+                  secret-ids: |
+                      lighthouse
+                  parse-json-secrets: true
+
+            - name: Cache Go Build
+              id: cache-go-build
+              uses: actions/cache@v4
+              with:
+                  path: main
+                  key: ${{ runner.os }}-go-build-${{ github.sha }}
+
+            - name: Checkout code
+              if: steps.cache-go-build.outputs.cache-hit != 'true'
+              uses: actions/checkout@v4
+
+            - name: Install golang
+              if: steps.cache-go-build.outputs.cache-hit != 'true'
+              uses: actions/setup-go@v5
+              with:
+                  go-version: 1.22.3
+
+            - name: Install dependencies
+              if: steps.cache-go-build.outputs.cache-hit != 'true'
+              run: go mod download
+
+            - name: Build the program
+              if: steps.cache-go-build.outputs.cache-hit != 'true'
+              run: go build -o main cmd/main/main.go
+
+            - name: Run the program
+              env:
+                  FIREBASE_CREDENTIALS: ${{ env.LIGHTHOUSE_FIREBASE_CREDENTIALS }}
+                  CHAIN_CONFIG: ${{ env.LIGHTHOUSE_CHAIN_CONFIG }}
+              run: ./main refresh-child-contracts --slug=${{ github.event.inputs.slug | 'all' }}

@@ -1,6 +1,0 @@
----
-# https://docs.ansible.com/ansible/latest/collections/amazon/aws/secretsmanager_secret_lookup.html#requirements
-- name: Set AWS Secret facts
-  set_fact:
-      aws_secret: "{{ lookup('amazon.aws.aws_secret', 'lighthouse', region=aws_region, access_key=aws_access_key, secret_key=aws_secret_access_key) }}"
-  # no_log: true
