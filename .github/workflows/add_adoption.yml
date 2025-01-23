@@ -57,7 +57,7 @@ jobs:
                   CHAIN_CONFIG: ${{ env.LIGHTHOUSE_CHAIN_CONFIG }}
               run: |
                   if [[ -n "${{ github.event.inputs.proposalUri }}" ]]; then
-                      ./main add-adoption --slug ${{ github.event.inputs.slug }} --chain ${{ github.event.inputs.chain }} --txhash ${{ github.event.inputs.txhash }} --proposal-uri "${{ github.event.inputs.proposalUri }}" --force ${{ github.event.inputs.force }}
+                      ./main add-adoption --slug ${{ github.event.inputs.slug }} --chain ${{ github.event.inputs.chain }} --txhash ${{ github.event.inputs.txhash }} --adoptionProposalUri "${{ github.event.inputs.proposalUri }}" --force ${{ github.event.inputs.force }}
                   else
                       ./main add-adoption --slug ${{ github.event.inputs.slug }} --chain ${{ github.event.inputs.chain }} --txhash ${{ github.event.inputs.txhash }}  --force ${{ github.event.inputs.force }}
                   fi
