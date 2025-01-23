@@ -201,9 +201,24 @@ func runRefreshChildContracts(cCtx *cli.Context) error {
 		return fmt.Errorf("LoadChainCfg: %w", err)
 	}
 
-	err = refreshChildContracts(fClient, slug, chainCfg)
+	//* Refresh single protocol
+	if slug != "all" {
+		return refreshChildContracts(fClient, slug, chainCfg)
+	}
+
+	//* Refresh all protocols
+	protocols := fClient.Collection(ProtocolsCollection)
+	documents, err := protocols.Documents(context.Background()).GetAll()
 	if err != nil {
-		return fmt.Errorf("refreshChildContracts: %w", err)
+		return fmt.Errorf("firestore.GetAll: %w", err)
+	}
+
+	for _, doc := range documents {
+		slug := doc.Ref.ID
+		err = refreshChildContracts(fClient, slug, chainCfg)
+		if err != nil {
+			return fmt.Errorf("refreshTvl: %w", err)
+		}
 	}
 
 	return nil

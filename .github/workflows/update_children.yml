@@ -5,11 +5,15 @@ on:
             slug:
                 description: "Defiliama protocol slug. If 'all' refreshes all protocols"
                 required: true
+    schedule:
+        # Runs daily at 10:25 AM UTC (5:25 AM EST)
+        # Odd time used to avoid conflicts with other workflows
+        - cron: "25 10 * * *"
 
 jobs:
     update_children:
         runs-on: ubuntu-latest
-        name: "Update Children: ${{ github.event.inputs.slug }}"
+        name: "Update Children: ${{ github.event.inputs.slug | 'all' }}"
 
         steps:
             - name: Configure AWS Credentials
@@ -44,4 +48,4 @@ jobs:
               env:
                   FIREBASE_CREDENTIALS: ${{ env.LIGHTHOUSE_FIREBASE_CREDENTIALS }}
                   CHAIN_CONFIG: ${{ env.LIGHTHOUSE_CHAIN_CONFIG }}
-              run: ./main refresh-child-contracts --slug=${{ github.event.inputs.slug }}
+              run: ./main refresh-child-contracts --slug=${{ github.event.inputs.slug | 'all' }}

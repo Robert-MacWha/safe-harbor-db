@@ -5,11 +5,15 @@ on:
             slug:
                 description: "Defiliama protocol slug. If 'all' refreshes all protocols"
                 required: true
+    schedule:
+        # Runs daily at 9:25 AM UTC (4:25 AM EST)
+        # Odd time used to avoid conflicts with other workflows
+        - cron: "25 9 * * *"
 
 jobs:
     update_tvl:
         runs-on: ubuntu-latest
-        name: "Update TVL: ${{ github.event.inputs.slug }}"
+        name: "Update TVL: ${{ github.event.inputs.slug || 'all' }}"
 
         steps:
             - name: Configure AWS Credentials
@@ -44,4 +48,4 @@ jobs:
               env:
                   FIREBASE_CREDENTIALS: ${{ env.LIGHTHOUSE_FIREBASE_CREDENTIALS }}
                   CHAIN_CONFIG: ${{ env.LIGHTHOUSE_CHAIN_CONFIG }}
-              run: ./main refresh-tvl --slug=${{ github.event.inputs.slug }}
+              run: ./main refresh-tvl --slug=${{ github.event.inputs.slug || 'all' }}
