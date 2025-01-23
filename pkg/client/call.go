@@ -1,8 +1,7 @@
-package call
+package client
 
 import (
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/nanmu42/etherscan-api"
 )
 
@@ -45,19 +44,4 @@ func (r *Calls) Flatten() []call {
 	}
 
 	return result
-}
-
-func DebugTraceTransaction(eClient *ethclient.Client, hash common.Hash) (*Calls, error) {
-	var result Calls
-	err := eClient.Client().Call(&result, "debug_traceTransaction", hash.String(), map[string]interface{}{
-		"tracer": "callTracer",
-		"tracerConfig": map[string]interface{}{
-			"onlyTopCall": false,
-		},
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	return &result, nil
 }

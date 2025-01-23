@@ -1,26 +1,15 @@
-name: add_adoption
+name: update_children
 on:
     workflow_dispatch:
         inputs:
             slug:
-                description: "Project defiliama slug"
+                description: "Defiliama protocol slug. If 'all' refreshes all protocols"
                 required: true
-            chain:
-                description: "Adoption chain"
-                required: true
-            txhash:
-                description: "Adoption transaction hash"
-                required: true
-            proposalUri:
-                description: "Adoption proposal uri"
-            force:
-                description: "Force adoption addition"
-                type: boolean
 
 jobs:
-    update_tvl:
+    update_children:
         runs-on: ubuntu-latest
-        name: "Add Adoption: ${{ github.event.inputs.slug }}"
+        name: "Update Children: ${{ github.event.inputs.slug }}"
 
         steps:
             - name: Configure AWS Credentials
@@ -55,9 +44,4 @@ jobs:
               env:
                   FIREBASE_CREDENTIALS: ${{ env.LIGHTHOUSE_FIREBASE_CREDENTIALS }}
                   CHAIN_CONFIG: ${{ env.LIGHTHOUSE_CHAIN_CONFIG }}
-              run: |
-                  if [[ -n "${{ github.event.inputs.proposalUri }}" ]]; then
-                      ./main add-adoption --slug ${{ github.event.inputs.slug }} --chain ${{ github.event.inputs.chain }} --txhash ${{ github.event.inputs.txhash }} --proposal-uri "${{ github.event.inputs.proposalUri }}" --force ${{ github.event.inputs.force }}
-                  else
-                      ./main add-adoption --slug ${{ github.event.inputs.slug }} --chain ${{ github.event.inputs.chain }} --txhash ${{ github.event.inputs.txhash }}  --force ${{ github.event.inputs.force }}
-                  fi
+              run: ./main refresh-child-contracts --slug=${{ github.event.inputs.slug }}

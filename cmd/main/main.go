@@ -1,7 +1,7 @@
 package main
 
 import (
-	"SHDB/pkg/call"
+	"SHDB/pkg/client"
 	"SHDB/pkg/config"
 	"SHDB/pkg/contracts/safeharbor"
 	"SHDB/pkg/defiliama"
@@ -12,7 +12,6 @@ import (
 	"log/slog"
 	"math/big"
 	"os"
-	"sync"
 	"time"
 
 	"cloud.google.com/go/firestore"
@@ -370,7 +369,7 @@ func refreshChildContracts(
 			continue
 		}
 
-		eClient, err := ethclient.Dial(chainCfg[chain.ID].RpcUrl)
+		eClient, err := client.Dial(chainCfg[chain.ID].RpcUrl)
 		if err != nil {
 			return fmt.Errorf("rpc.Dial: %w", err)
 		}
@@ -395,15 +394,14 @@ func refreshChildContracts(
 				continue
 			}
 
-			var b = int(block)
-			var endBlock *int = &b
+			var endBlock int = int(block)
 			if account.ChildContractScope == firebase.ChildContractScopeExistingOnly {
-				endBlock = &agreement.CreatedBlock
+				endBlock = agreement.CreatedBlock
 			}
 
 			log.Debug("Refreshing child contracts", "scope", account.ChildContractScope, "from", lastIndexed, "to", endBlock)
 			var accountAddr = common.HexToAddress(account.Address)
-			children, err := getAccountChildren(eClient, sClient, accountAddr, lastIndexed, endBlock)
+			children, err := getAccountChildren(eClient, sClient, accountAddr, lastIndexed, &endBlock)
 			if err != nil {
 				return fmt.Errorf(
 					"getAccountChildren(accountAddr=%v, chain=%v, agreement=%v): %w",
@@ -414,6 +412,9 @@ func refreshChildContracts(
 				)
 			}
 
+			if agreement.Chains[i].Accounts[j].Name == "" {
+				agreement.Chains[i].Accounts[j].Name = sClient.ContractName(account.Address)
+			}
 			agreement.Chains[i].Accounts[j].Children = children
 			totalChildren += len(children)
 		}
@@ -440,40 +441,45 @@ func refreshChildContracts(
 }
 
 func getAccountChildren(
-	eClient *ethclient.Client,
+	eClient client.EthClient,
 	sClient scan.Client,
 	accountAddr common.Address,
 	startBlock int,
 	endBlock *int,
 ) (children []firebase.ChildAccount, err error) {
 	// Get all txhashes that interacted with this account
-	txnHashes, err := getAccountTxns(sClient, accountAddr, startBlock, endBlock)
+	txns, err := getAccountTxns(sClient, accountAddr, startBlock, endBlock)
 	if err != nil {
 		return nil, fmt.Errorf("getAccountTxns: %w", err)
 	}
 
-	if len(txnHashes) == 0 {
+	if len(txns) == 0 {
 		return []firebase.ChildAccount{}, nil
 	}
-	slog.Debug("Found transactions", "account", accountAddr, "count", len(txnHashes))
+	slog.Debug("Found transactions", "account", accountAddr, "count", len(txns))
 
 	// Trace all transactions to find subcontracts
-	mu := &sync.Mutex{}
-	wg := &sync.WaitGroup{}
+	// TODO: This may encounter issues if some function signatures conditionally create subcontracts
+	noSubContractFunctionSignatures := make(map[string]bool)
 	children = []firebase.ChildAccount{}
-	for _, hash := range txnHashes {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			newChildren := getTxnChildren(eClient, sClient, hash, accountAddr, startBlock, endBlock)
+	for _, txn := range txns {
+		txInput := txn.Input
+		if len(txn.Input) > 10 {
+			txInput = txn.Input[:10]
+		}
 
-			mu.Lock()
-			children = append(children, newChildren...)
-			mu.Unlock()
-		}()
+		if _, exists := noSubContractFunctionSignatures[txInput]; exists {
+			continue
+		}
+
+		newChildren := getTxnChildren(eClient, sClient, common.HexToHash(txn.Hash), accountAddr, startBlock, endBlock)
+		if len(newChildren) == 0 {
+			noSubContractFunctionSignatures[txInput] = true
+		}
+
+		children = append(children, newChildren...)
 	}
 
-	wg.Wait()
 	if len(children) != 0 {
 		slog.Debug("Found child contracts", "account", accountAddr, "count", len(children))
 	}
@@ -485,8 +491,9 @@ func getAccountChildren(
 //
 // ? May return duplicate transactions, but they will be infrequent. Processing duplicates is probably more performant than
 // ? trying to filter them out for large sets.
-func getAccountTxns(sClient scan.Client, accountAddr common.Address, startBlock int, endBlock *int) ([]common.Hash, error) {
-	var hashes []common.Hash
+func getAccountTxns(sClient scan.Client, accountAddr common.Address, startBlock int, endBlock *int) ([]scan.Tx, error) {
+	var txns []scan.Tx
+	hashmap := map[string]bool{}
 
 	// TODO: Merge these two loops if you can find a clean approach
 	// TODO: Write smarter rate limit handling
@@ -504,7 +511,13 @@ func getAccountTxns(sClient scan.Client, accountAddr common.Address, startBlock 
 
 		updatedLastIndexed := false
 		for _, txn := range txns {
-			hashes = append(hashes, common.HexToHash(txn.Hash))
+			if _, exists := hashmap[txn.Hash]; exists {
+				continue
+			}
+
+			hashmap[txn.Hash] = true
+
+			txns = append(txns, txn)
 			if txn.BlockNumber > lastRegularIndexed {
 				lastRegularIndexed = txn.BlockNumber
 				updatedLastIndexed = true
@@ -532,7 +545,13 @@ func getAccountTxns(sClient scan.Client, accountAddr common.Address, startBlock 
 
 		updatedLastIndexed := false
 		for _, txn := range txns {
-			hashes = append(hashes, common.HexToHash(txn.Hash))
+			if _, exists := hashmap[txn.Hash]; exists {
+				continue
+			}
+
+			hashmap[txn.Hash] = true
+
+			txns = append(txns, txn)
 			if txn.BlockNumber > lastInternalIndexed {
 				lastInternalIndexed = txn.BlockNumber
 				updatedLastIndexed = true
@@ -546,18 +565,18 @@ func getAccountTxns(sClient scan.Client, accountAddr common.Address, startBlock 
 
 	}
 
-	return hashes, nil
+	return txns, nil
 }
 
 func getTxnChildren(
-	eClient *ethclient.Client,
+	eClient client.EthClient,
 	sClient scan.Client,
 	hash common.Hash,
 	accountAddr common.Address,
 	startBlock int,
 	endBlock *int,
 ) []firebase.ChildAccount {
-	calls, err := call.DebugTraceTransaction(eClient, hash)
+	calls, err := eClient.DebugTraceTransaction(hash)
 	if err != nil {
 		slog.Warn("Failed to debug trace transaction", "account", accountAddr, "hash", hash, "error", err)
 		return nil
@@ -574,6 +593,7 @@ func getTxnChildren(
 
 			newChildren = append(newChildren, firebase.ChildAccount{
 				Address: call.To.String(),
+				Name:    sClient.ContractName(call.To.String()),
 			})
 			newChildren = append(newChildren, recursiveChildren...)
 		}
