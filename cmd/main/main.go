@@ -26,6 +26,11 @@ import (
 	"google.golang.org/grpc/status"
 )
 
+const (
+	ProtocolCollectionName  = "protocols"
+	AgreementCollectionName = "safeHarborAgreements"
+)
+
 const EtherscanErrNoTxns string = "etherscan server: No transactions found"
 
 func main() {
@@ -488,8 +493,8 @@ func refreshChildContracts(
 }
 
 func getCollectionNames(cCtx *cli.Context) (protocolCol string, agreementCol string) {
-	protocolCol = "protocols"
-	agreementCol = "safeHarborAgreements"
+	protocolCol = ProtocolCollectionName
+	agreementCol = AgreementCollectionName
 
 	if !cCtx.Bool("prod") {
 		protocolCol = "test_" + protocolCol
