@@ -59,4 +59,4 @@ jobs:
               env:
                   FIREBASE_CREDENTIALS: ${{ env.LIGHTHOUSE_FIREBASE_CREDENTIALS }}
                   CHAIN_CONFIG: ${{ env.LIGHTHOUSE_CHAIN_CONFIG }}
-              run: ./main refresh-tvl --slug=${{ github.event.inputs.slug || 'all' }}
+              run: ./main refresh-tvl --slug=${{ github.event.inputs.slug || 'all' }}  -p

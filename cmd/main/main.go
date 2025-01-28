@@ -28,11 +28,6 @@ import (
 
 const EtherscanErrNoTxns string = "etherscan server: No transactions found"
 
-const (
-	ProtocolsCollection = "protocols-test"
-	AgreementCollection = "safeHarborAgreement-test"
-)
-
 func main() {
 	app := &cli.App{
 		Name:  "shdb",
@@ -68,6 +63,12 @@ func main() {
 						Usage:   "Force the command to run even if the protocol already exists in the database",
 						Value:   false,
 					},
+					&cli.BoolFlag{
+						Name:    "prod",
+						Aliases: []string{"p"},
+						Usage:   "Run in production mode. If false, writes to a test collection",
+						Value:   false,
+					},
 				},
 			},
 			{
@@ -80,6 +81,12 @@ func main() {
 						Usage:    "Defiliama slug of the protocol. If 'all', refreshes all protocols",
 						Required: true,
 					},
+					&cli.BoolFlag{
+						Name:    "prod",
+						Aliases: []string{"p"},
+						Usage:   "Run in production mode. If false, writes to a test collection",
+						Value:   false,
+					},
 				},
 			},
 			{
@@ -91,6 +98,12 @@ func main() {
 						Name:     "slug",
 						Usage:    "Defiliama slug of the protocol. If 'all', refreshes all protocols",
 						Required: true,
+					},
+					&cli.BoolFlag{
+						Name:    "prod",
+						Aliases: []string{"p"},
+						Usage:   "Run in production mode. If false, writes to a test collection",
+						Value:   false,
 					},
 				},
 			},
@@ -119,6 +132,8 @@ func runAddAdoption(cCtx *cli.Context) error {
 	force := cCtx.Bool("force")
 	txhash := common.HexToHash(txHashStr)
 
+	protocolCol, agreementCol := getCollectionNames(cCtx)
+
 	fClient, err := firebase.NewFirestoreClient()
 	if err != nil {
 		return fmt.Errorf("NewFirestoreClient: %w", err)
@@ -138,12 +153,12 @@ func runAddAdoption(cCtx *cli.Context) error {
 		return fmt.Errorf("rpc.Dial: %w", err)
 	}
 
-	err = addAdoption(eClient, fClient, slug, chain, txhash, force)
+	err = addAdoption(eClient, fClient, protocolCol, agreementCol, slug, chain, txhash, force)
 	if err != nil {
 		return fmt.Errorf("addAdoption: %w", err)
 	}
 
-	err = refreshChildContracts(fClient, slug, chainCfg)
+	err = refreshChildContracts(fClient, protocolCol, agreementCol, slug, chainCfg)
 	if err != nil {
 		return fmt.Errorf("refreshChildContracts: %w", err)
 	}
@@ -157,6 +172,8 @@ func runRefreshTvl(cCtx *cli.Context) error {
 	//* Load config
 	slug := cCtx.String("slug")
 
+	protocolCol, _ := getCollectionNames(cCtx)
+
 	fClient, err := firebase.NewFirestoreClient()
 	if err != nil {
 		return fmt.Errorf("NewFirestoreClient: %w", err)
@@ -164,11 +181,11 @@ func runRefreshTvl(cCtx *cli.Context) error {
 
 	//* Refresh single protocol
 	if slug != "all" {
-		return refreshTvl(fClient, slug)
+		return refreshTvl(fClient, protocolCol, slug)
 	}
 
 	//* Refresh all protocols
-	protocols := fClient.Collection(ProtocolsCollection)
+	protocols := fClient.Collection(protocolCol)
 	documents, err := protocols.Documents(context.Background()).GetAll()
 	if err != nil {
 		return fmt.Errorf("firestore.GetAll: %w", err)
@@ -176,7 +193,7 @@ func runRefreshTvl(cCtx *cli.Context) error {
 
 	for _, doc := range documents {
 		slug := doc.Ref.ID
-		err = refreshTvl(fClient, slug)
+		err = refreshTvl(fClient, protocolCol, slug)
 		if err != nil {
 			slog.Warn("refreshTvl", "error", err)
 		}
@@ -190,6 +207,7 @@ func runRefreshChildContracts(cCtx *cli.Context) error {
 
 	//* Load config
 	slug := cCtx.String("slug")
+	protocolCol, agreementCol := getCollectionNames(cCtx)
 
 	fClient, err := firebase.NewFirestoreClient()
 	if err != nil {
@@ -203,11 +221,11 @@ func runRefreshChildContracts(cCtx *cli.Context) error {
 
 	//* Refresh single protocol
 	if slug != "all" {
-		return refreshChildContracts(fClient, slug, chainCfg)
+		return refreshChildContracts(fClient, protocolCol, agreementCol, slug, chainCfg)
 	}
 
 	//* Refresh all protocols
-	protocols := fClient.Collection(ProtocolsCollection)
+	protocols := fClient.Collection(protocolCol)
 	documents, err := protocols.Documents(context.Background()).GetAll()
 	if err != nil {
 		return fmt.Errorf("firestore.GetAll: %w", err)
@@ -215,7 +233,7 @@ func runRefreshChildContracts(cCtx *cli.Context) error {
 
 	for _, doc := range documents {
 		slug := doc.Ref.ID
-		err = refreshChildContracts(fClient, slug, chainCfg)
+		err = refreshChildContracts(fClient, protocolCol, agreementCol, slug, chainCfg)
 		if err != nil {
 			slog.Warn("refreshChildContracts", "error", err)
 		}
@@ -224,7 +242,16 @@ func runRefreshChildContracts(cCtx *cli.Context) error {
 	return nil
 }
 
-func addAdoption(eClient *ethclient.Client, fClient *firestore.Client, slug string, chain int, txhash common.Hash, force bool) error {
+func addAdoption(
+	eClient *ethclient.Client,
+	fClient *firestore.Client,
+	protocolCol string,
+	agreementCol string,
+	slug string,
+	chain int,
+	txhash common.Hash,
+	force bool,
+) error {
 	txbody, _, err := eClient.TransactionByHash(context.Background(), txhash)
 	if err != nil {
 		return fmt.Errorf("rpc.TransactionByHash: %w", err)
@@ -253,7 +280,7 @@ func addAdoption(eClient *ethclient.Client, fClient *firestore.Client, slug stri
 
 	//* Upload protocol & adoption to firestore if not already present
 	// Check if protocol exists
-	protocolDocRef := fClient.Collection(ProtocolsCollection).Doc(protocol.Slug)
+	protocolDocRef := fClient.Collection(protocolCol).Doc(protocol.Slug)
 	protocolDoc, err := protocolDocRef.Get(context.Background())
 	if err != nil && status.Code(err) != codes.NotFound {
 		return fmt.Errorf("firestore.Get: %w", err)
@@ -296,7 +323,7 @@ func addAdoption(eClient *ethclient.Client, fClient *firestore.Client, slug stri
 
 	// Upload safe harbor adoption
 	slog.Info("Uploading adoption", "adoption", txhash.String())
-	agreementDocRef := fClient.Collection(AgreementCollection).Doc(txhash.String())
+	agreementDocRef := fClient.Collection(agreementCol).Doc(txhash.String())
 	_, err = agreementDocRef.Set(context.Background(), fAdoption)
 	if err != nil {
 		return fmt.Errorf("firestore.Set: %w", err)
@@ -314,9 +341,13 @@ func addAdoption(eClient *ethclient.Client, fClient *firestore.Client, slug stri
 	return nil
 }
 
-func refreshTvl(fClient *firestore.Client, slug string) error {
+func refreshTvl(
+	fClient *firestore.Client,
+	protocolCol string,
+	slug string,
+) error {
 	//* Confirm protocol exists
-	protocolDocRef := fClient.Collection(ProtocolsCollection).Doc(slug)
+	protocolDocRef := fClient.Collection(protocolCol).Doc(slug)
 	protocolDoc, err := protocolDocRef.Get(context.Background())
 	if err != nil {
 		return fmt.Errorf("firestore.Get: %w", err)
@@ -348,10 +379,12 @@ func refreshTvl(fClient *firestore.Client, slug string) error {
 
 func refreshChildContracts(
 	fClient *firestore.Client,
+	protocolCol string,
+	agreementCol string,
 	slug string,
 	chainCfg map[int]config.ChainCfg,
 ) error {
-	protocolDocRef := fClient.Collection(ProtocolsCollection).Doc(slug)
+	protocolDocRef := fClient.Collection(protocolCol).Doc(slug)
 	protocolDoc, err := protocolDocRef.Get(context.Background())
 	if err != nil {
 		return fmt.Errorf("firestore.Get: %w", err)
@@ -364,7 +397,7 @@ func refreshChildContracts(
 	}
 
 	agreementId := protocol.SafeHarborAgreement.ID
-	agreementDocRef := fClient.Collection(AgreementCollection).Doc(agreementId)
+	agreementDocRef := fClient.Collection(agreementCol).Doc(agreementId)
 	agreementDoc, err := agreementDocRef.Get(context.Background())
 	if err != nil {
 		return fmt.Errorf("firestore.Get: %w", err)
@@ -454,6 +487,18 @@ func refreshChildContracts(
 	return nil
 }
 
+func getCollectionNames(cCtx *cli.Context) (protocolCol string, agreementCol string) {
+	protocolCol = "protocols"
+	agreementCol = "safeHarborAgreements"
+
+	if !cCtx.Bool("prod") {
+		protocolCol = "test_" + protocolCol
+		agreementCol = "test_" + agreementCol
+	}
+
+	return protocolCol, agreementCol
+}
+
 func getAccountChildren(
 	eClient client.EthClient,
 	sClient scan.Client,
@@ -505,7 +550,12 @@ func getAccountChildren(
 //
 // ? May return duplicate transactions, but they will be infrequent. Processing duplicates is probably more performant than
 // ? trying to filter them out for large sets.
-func getAccountTxns(sClient scan.Client, accountAddr common.Address, startBlock int, endBlock *int) ([]scan.Tx, error) {
+func getAccountTxns(
+	sClient scan.Client,
+	accountAddr common.Address,
+	startBlock int,
+	endBlock *int,
+) ([]scan.Tx, error) {
 	var txns []scan.Tx
 	hashmap := map[string]bool{}
 
