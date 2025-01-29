@@ -67,8 +67,4 @@ jobs:
                   FIREBASE_CREDENTIALS: ${{ env.LIGHTHOUSE_FIREBASE_CREDENTIALS }}
                   CHAIN_CONFIG: ${{ env.LIGHTHOUSE_CHAIN_CONFIG }}
               run: |
-                  if [[ -n "${{ github.event.inputs.proposalUri }}" ]]; then
-                      ./main add-adoption --slug ${{ github.event.inputs.slug }} --chain ${{ github.event.inputs.chain }} --txhash ${{ github.event.inputs.txhash }} --adoptionProposalUri "${{ github.event.inputs.proposalUri }}" -f ${{ github.event.inputs.force }} -p  true
-                  else
-                      ./main add-adoption --slug ${{ github.event.inputs.slug }} --chain ${{ github.event.inputs.chain }} --txhash ${{ github.event.inputs.txhash }}  -f ${{ github.event.inputs.force }} -p true
-                  fi
+                  ./main add-adoption --slug=${{ github.event.inputs.slug }} --chain=${{ github.event.inputs.chain }} --txhash=${{ github.event.inputs.txhash }} --adoptionProposalUri="${{ github.event.inputs.proposalUri || '' }}" --force=${{ github.event.inputs.force }} --prod=true
