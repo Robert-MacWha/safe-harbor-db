@@ -497,6 +497,7 @@ func getCollectionNames(cCtx *cli.Context) (protocolCol string, agreementCol str
 	agreementCol = AgreementCollectionName
 
 	if !cCtx.Bool("prod") {
+		slog.Warn("Running in test mode")
 		protocolCol = "test_" + protocolCol
 		agreementCol = "test_" + agreementCol
 	}
