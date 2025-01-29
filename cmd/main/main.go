@@ -565,6 +565,7 @@ func getAccountTxns(
 	// TODO: Write smarter rate limit handling
 	// Fetch regular transactions
 	lastRegularIndexed := startBlock
+	errCount := 0
 	for {
 		normalTxns, err := sClient.NormalTxByAddress(accountAddr.String(), &lastRegularIndexed, endBlock, 0, 0, true)
 		if err != nil && err.Error() == EtherscanErrNoTxns {
@@ -572,8 +573,22 @@ func getAccountTxns(
 		}
 
 		if err != nil {
-			return nil, fmt.Errorf("etherscan.NormalTxByAddress: %w", err)
+			slog.Warn(
+				"etherscan.NormalTxByAddress",
+				"addr", accountAddr,
+				"start", lastRegularIndexed,
+				"end", endBlock,
+				"error", err,
+			)
+			errCount += 1
+			time.Sleep(5 * time.Second)
+			if errCount > 5 {
+				return nil, fmt.Errorf("etherscan.NormalTxByAddress: %w", err)
+			}
+
+			continue
 		}
+		errCount = 0
 
 		updatedLastIndexed := false
 		for _, txn := range normalTxns {
@@ -606,8 +621,22 @@ func getAccountTxns(
 		}
 
 		if err != nil {
-			return nil, fmt.Errorf("etherscan.InternalTxByAddress: %w", err)
+			slog.Warn(
+				"etherscan.InternalTxByAddress",
+				"addr", accountAddr,
+				"start", lastRegularIndexed,
+				"end", endBlock,
+				"error", err,
+			)
+			errCount += 1
+			time.Sleep(5 * time.Second)
+			if errCount > 5 {
+				return nil, fmt.Errorf("etherscan.InternalTxByAddress: %w", err)
+			}
+
+			continue
 		}
+		errCount = 0
 
 		updatedLastIndexed := false
 		for _, txn := range internalTxns {
