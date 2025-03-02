@@ -3,6 +3,7 @@ package config
 import (
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"os"
 	"strings"
 )
@@ -43,12 +44,13 @@ func LoadChainCfg() (map[int]ChainCfg, error) {
 	}
 
 	for chain, cfg := range chainCfg {
-		if _, exists := scanUrls[chain]; !exists {
-			return nil, fmt.Errorf("invalid chain ID in chain config: %d", chain)
+		if scanUrl, exists := scanUrls[chain]; !exists {
+			slog.Warn("Missing scan for chain, removing from config", "chain", chain)
+			delete(chainCfg, chain)
+		} else {
+			cfg.ScanUrl = scanUrl
+			chainCfg[chain] = cfg
 		}
-
-		cfg.ScanUrl = scanUrls[chain]
-		chainCfg[chain] = cfg
 	}
 
 	return chainCfg, nil
