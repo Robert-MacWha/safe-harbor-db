@@ -20,11 +20,12 @@ type tvl struct {
 }
 
 type protocolDetail struct {
-	Name    string `json:"name"`
-	URL     string `json:"url"`
-	Logo    string `json:"logo"`
-	Twitter string `json:"twitter"`
-	TVL     []tvl  `json:"tvl"`
+	Name     string             `json:"name"`
+	URL      string             `json:"url"`
+	Logo     string             `json:"logo"`
+	Twitter  string             `json:"twitter"`
+	TVL      []tvl              `json:"tvl"`
+	ChainTVL map[string]float64 `json:"currentChainTvls"`
 }
 
 type protocolCategory struct {
@@ -49,7 +50,12 @@ func GetTvl(slug string) (float64, error) {
 		return 0, fmt.Errorf("json.Decode: %w", err)
 	}
 
-	return getLastTVL(details.TVL), nil
+	lastTvl := getLastTVL(details.TVL)
+	if borrowed, ok := details.ChainTVL["borrowed"]; ok {
+		lastTvl += borrowed
+	}
+
+	return lastTvl, nil
 }
 
 func GetProtocol(slug string) (Protocol, error) {
