@@ -159,11 +159,6 @@ func runAddAdoption(cCtx *cli.Context) error {
 		return fmt.Errorf("addAdoption: %w", err)
 	}
 
-	err = refreshChildContracts(fClient, protocolCol, agreementCol, slug, chainCfg)
-	if err != nil {
-		return fmt.Errorf("refreshChildContracts: %w", err)
-	}
-
 	return nil
 }
 
