@@ -358,8 +358,17 @@ func refreshTvl(
 		return fmt.Errorf("protocol not found in firestore")
 	}
 
+	//* Get the slug from the document
+	var protocol firebase.Protocol
+	err = protocolDoc.DataTo(&protocol)
+	if err != nil {
+		return fmt.Errorf("firestore.DataTo: %w", err)
+	}
+
+	slug = protocol.Slug
+
 	//* Fetch and update TVL
-	tvl, err := defiliama.GetTvl(slug)
+	tvl, err := defiliama.GetTvl(protocol.Slug)
 	if err != nil {
 		return fmt.Errorf("defiliama.GetProtocol(slug=%v): %w", slug, err)
 	}
