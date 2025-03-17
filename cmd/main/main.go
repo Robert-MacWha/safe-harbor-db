@@ -131,6 +131,7 @@ func runAddAdoption(cCtx *cli.Context) error {
 	chain := cCtx.Int("chain")
 	txHashStr := cCtx.String("txhash")
 	force := cCtx.Bool("force")
+	adoptionProposalUri := cCtx.String("adoptionProposalUri")
 	txhash := common.HexToHash(txHashStr)
 
 	protocolCol, agreementCol := getCollectionNames(cCtx)
@@ -154,7 +155,7 @@ func runAddAdoption(cCtx *cli.Context) error {
 		return fmt.Errorf("rpc.Dial: %w", err)
 	}
 
-	err = addAdoption(eClient, fClient, protocolCol, agreementCol, slug, chain, txhash, force)
+	err = addAdoption(eClient, fClient, protocolCol, agreementCol, slug, chain, txhash, adoptionProposalUri, force)
 	if err != nil {
 		return fmt.Errorf("addAdoption: %w", err)
 	}
@@ -246,6 +247,7 @@ func addAdoption(
 	slug string,
 	chain int,
 	txhash common.Hash,
+	adoptionProposalUri string,
 	force bool,
 ) error {
 	txbody, _, err := eClient.TransactionByHash(context.Background(), txhash)
@@ -310,6 +312,7 @@ func addAdoption(
 		AgreementAddress:    agreementAddress.String(),
 		Entity:              sender.String(),
 		AgreementURI:        agreement.AgreementURI,
+		AdoptionProposalURI: adoptionProposalUri,
 		ContactDetails:      firebase.FormatContactDetails(agreement.ContactDetails),
 		Chains:              firebase.FormatChains(agreement.Chains),
 		BountyTerms:         firebase.FormatBountyTerms(agreement.BountyTerms),
