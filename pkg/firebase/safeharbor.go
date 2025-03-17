@@ -34,6 +34,7 @@ type SafeHarborAgreement struct {
 	AgreementAddress    string                 `firestore:"agreementAddress"`
 	Entity              string                 `firestore:"entity"` // Creator EOA
 	AgreementURI        string                 `firestore:"agreementURI"`
+	AdoptionProposalURI string                 `firestore:"adoptionProposalURI"`
 	ContactDetails      string                 `firestore:"contactDetails"`
 	Chains              []Chain                `firestore:"chains"`
 	BountyTerms         BountyTerms            `firestore:"bountyTerms"`
