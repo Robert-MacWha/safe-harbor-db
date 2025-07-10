@@ -23,19 +23,9 @@ jobs:
         name: "Add Adoption: ${{ github.event.inputs.slug }}"
 
         steps:
-            - name: Configure AWS Credentials
-              uses: aws-actions/configure-aws-credentials@v4
+            - uses: oNaiPs/secrets-to-env-action@v1
               with:
-                  aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-                  aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-                  aws-region: us-east-1
-
-            - name: Fetch AWS Lighthouse Secrets
-              uses: aws-actions/aws-secretsmanager-get-secrets@v2
-              with:
-                  secret-ids: |
-                      lighthouse
-                  parse-json-secrets: true
+                secrets: ${{ toJSON(secrets) }}
 
             - name: Cache Go Build
               id: cache-go-build
@@ -63,8 +53,7 @@ jobs:
               run: go build -o main cmd/main/main.go
 
             - name: Run the program
-              env:
-                  FIREBASE_CREDENTIALS: ${{ env.LIGHTHOUSE_FIREBASE_CREDENTIALS }}
-                  CHAIN_CONFIG: ${{ env.LIGHTHOUSE_CHAIN_CONFIG }}
+              with:
+                secrets: ${{ toJSON(secrets) }}
               run: |
                   ./main add-adoption --slug=${{ github.event.inputs.slug }} --chain=${{ github.event.inputs.chain }} --txhash=${{ github.event.inputs.txhash }} --adoptionProposalUri="${{ github.event.inputs.proposalUri || '' }}" --force=${{ github.event.inputs.force }} --prod=true
