@@ -1,11 +1,9 @@
 package config
 
 import (
-	"encoding/json"
 	"fmt"
 	"log/slog"
 	"os"
-	"strings"
 )
 
 type ChainCfg struct {
@@ -16,40 +14,43 @@ type ChainCfg struct {
 
 var scanUrls = map[int]string{
 	1:        "https://api.etherscan.io/api?",
-	137:      "https://api.polygonscan.com/api?",
-	17000:    "https://api-holesky.etherscan.io/api?",
-	11155111: "https://api-sepolia.etherscan.io/api?",
-	42161:    "https://api.arbiscan.io/api?",
-	8453:     "https://api.basescan.org/api?",
 	10:       "https://api-optimistic.etherscan.io/api?",
 	56:       "https://api.bscscan.com/api?",
-	1101:     "https://api-zkevm.polygonscan.com/api?",
-	43114:    "https://api.routescan.io/v2/network/mainnet/evm/43114/etherscan/api?",
 	100:      "https://api.gnosisscan.io/api?",
+	137:      "https://api.polygonscan.com/api?",
+	1101:     "https://api-zkevm.polygonscan.com/api?",
+	8453:     "https://api.basescan.org/api?",
+	17000:    "https://api-holesky.etherscan.io/api?",
+	42161:    "https://api.arbiscan.io/api?",
+	43114:    "https://api.routescan.io/v2/network/mainnet/evm/43114/etherscan/api?",
+	11155111: "https://api-sepolia.etherscan.io/api?",
 }
 
 // Loads and unmarshals the CHAIN_CONFIG environment variable
 func LoadChainCfg() (map[int]ChainCfg, error) {
-	chainCfgStr := os.Getenv("CHAIN_CONFIG")
-	if chainCfgStr == "" {
-		return nil, fmt.Errorf("missing CHAIN_CONFIG env")
-	}
+	chainCfg := make(map[int]ChainCfg)
+	for chain, scanUrl := range scanUrls {
 
-	chainCfgStr = strings.Trim(chainCfgStr, "'")
+		//? Stored as environment secrets
+		rpcUrlEnv := fmt.Sprintf("RPC_URL_%d", chain)
+		scanKeyEnv := fmt.Sprintf("SCAN_KEY_%d", chain)
 
-	var chainCfg map[int]ChainCfg
-	err := json.Unmarshal([]byte(chainCfgStr), &chainCfg)
-	if err != nil {
-		return nil, fmt.Errorf("failed to unmarshal chain config: %w", err)
-	}
+		rpcUrl := os.Getenv(rpcUrlEnv)
+		if rpcUrl == "" {
+			slog.Warn("Missing RPC URL for chain, removing from config", "chain", chain)
+			continue
+		}
 
-	for chain, cfg := range chainCfg {
-		if scanUrl, exists := scanUrls[chain]; !exists {
-			slog.Warn("Missing scan for chain, removing from config", "chain", chain)
-			delete(chainCfg, chain)
-		} else {
-			cfg.ScanUrl = scanUrl
-			chainCfg[chain] = cfg
+		scanKey := os.Getenv(scanKeyEnv)
+		if scanKey == "" {
+			slog.Warn("Missing scan key for chain, removing from config", "chain", chain)
+			continue
+		}
+
+		chainCfg[chain] = ChainCfg{
+			RpcUrl:  rpcUrl,
+			ScanUrl: scanUrl,
+			ScanKey: scanKey,
 		}
 	}
 
