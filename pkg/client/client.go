@@ -59,9 +59,9 @@ func (r *RateLimitedClient) DebugTraceTransaction(hash common.Hash) (*Calls, err
 	defer r.sleep()
 
 	var result Calls
-	err := r.c.Client().Call(&result, "debug_traceTransaction", hash.String(), map[string]interface{}{
+	err := r.c.Client().Call(&result, "debug_traceTransaction", hash.String(), map[string]any{
 		"tracer": "callTracer",
-		"tracerConfig": map[string]interface{}{
+		"tracerConfig": map[string]any{
 			"onlyTopCall": false,
 		},
 	})

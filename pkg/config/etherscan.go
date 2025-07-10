@@ -30,7 +30,6 @@ var scanUrls = map[int]string{
 func LoadChainCfg() (map[int]ChainCfg, error) {
 	chainCfg := make(map[int]ChainCfg)
 	for chain, scanUrl := range scanUrls {
-
 		//? Stored as environment secrets
 		rpcUrlEnv := fmt.Sprintf("RPC_URL_%d", chain)
 		scanKeyEnv := fmt.Sprintf("SCAN_KEY_%d", chain)

@@ -186,7 +186,7 @@ func runRefreshTvl(cCtx *cli.Context) error {
 
 	for _, doc := range documents {
 		slug := doc.Ref.ID
-		slog.Info("Refreshing TVL for protocol", "slug", slug)
+		slog.Info("Refreshing TVL for protocol", "protocol", slug)
 		err = refreshTvl(fClient, protocolCol, slug)
 		if err != nil {
 			slog.Warn("refreshTvl", "error", err)
@@ -368,7 +368,7 @@ func refreshTvl(
 		return fmt.Errorf("defiliama.GetProtocol(slug=%v): %w", slug, err)
 	}
 
-	data := map[string]interface{}{
+	data := map[string]any{
 		"tvl": tvl,
 	}
 
