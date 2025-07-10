@@ -53,7 +53,5 @@ jobs:
               run: go build -o main cmd/main/main.go
 
             - name: Run the program
-              with:
-                secrets: ${{ toJSON(secrets) }}
               run: |
                   ./main add-adoption --slug=${{ github.event.inputs.slug }} --chain=${{ github.event.inputs.chain }} --txhash=${{ github.event.inputs.txhash }} --adoptionProposalUri="${{ github.event.inputs.proposalUri || '' }}" --force=${{ github.event.inputs.force }} --prod=true

@@ -46,6 +46,4 @@ jobs:
               run: go build -o main cmd/main/main.go
 
             - name: Run the program
-              with:
-                secrets: ${{ toJSON(secrets) }}
               run: ./main refresh-child-contracts --slug=${{ github.event.inputs.slug || 'all' }} --prod=true
