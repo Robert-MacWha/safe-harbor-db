@@ -8,14 +8,6 @@ on:
             defiliama-slug:
                 description: "Project defiliama slug"
                 required: true
-            chain:
-                description: "Adoption chain"
-                required: true
-            txhash:
-                description: "Adoption transaction hash"
-                required: true
-            proposalUri:
-                description: "Adoption proposal uri"
             force:
                 description: "Force adoption addition"
                 type: boolean
@@ -23,7 +15,7 @@ on:
 jobs:
     update_tvl:
         runs-on: ubuntu-latest
-        name: "Add Immunefi Adoption: ${{ github.event.inputs.slug }}"
+        name: "Add Immunefi Adoption: ${{ github.event.inputs.immunefi-slug }}"
 
         steps:
             - uses: oNaiPs/secrets-to-env-action@v1
@@ -57,4 +49,4 @@ jobs:
 
             - name: Run the program
               run: |
-                  ./main add-immunefi-adoption --immunefi-slug=${{ github.event.inputs.immunefi-slug }} --defiliama-slug=${{ github.event.inputs.defiliama-slug }} --chain=${{ github.event.inputs.chain }} --txhash=${{ github.event.inputs.txhash }} --adoptionProposalUri="${{ github.event.inputs.proposalUri || '' }}" --force=${{ github.event.inputs.force }} --prod=true
+                  ./main add-immunefi-adoption --immunefi-slug=${{ github.event.inputs.immunefi-slug }} --defiliama-slug=${{ github.event.inputs.defiliama-slug }} --force=${{ github.event.inputs.force }} --prod=true

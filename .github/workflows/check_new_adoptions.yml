@@ -9,7 +9,7 @@ on:
 jobs:
     update_tvl:
         runs-on: ubuntu-latest
-        name: "Check New Adoptions: ${{ github.event.inputs.slug }}"
+        name: "Check New Adoptions"
 
         steps:
             - uses: oNaiPs/secrets-to-env-action@v1
