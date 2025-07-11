@@ -179,6 +179,10 @@ func (d detailedImmunefiBounty) toAdoptionDetails() AdoptionDetails {
 		parseImmunefiAsset(asset, chains, agreementDetails)
 	}
 
+	for _, chain := range chains {
+		agreementDetails.Chains = append(agreementDetails.Chains, chain)
+	}
+
 	return agreementDetails
 }
 
@@ -202,12 +206,12 @@ func parseImmunefiAsset(asset detailedImmunefiBountyAsset, chains map[int]fireba
 	chain, exists := chains[chainId]
 	if exists {
 		chain.Accounts = append(chain.Accounts, account)
-	}
-
-	chain = firebase.Chain{
-		ID:                   chainId,
-		AssetRecoveryAddress: agreementDetails.AgreementURI,
-		Accounts:             []firebase.Account{account},
+	} else {
+		chain = firebase.Chain{
+			ID:                   chainId,
+			AssetRecoveryAddress: agreementDetails.AgreementURI,
+			Accounts:             []firebase.Account{account},
+		}
 	}
 
 	chains[chainId] = chain
