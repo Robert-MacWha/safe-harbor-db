@@ -1,4 +1,4 @@
-name: add_adoption
+name: add_immunefi_adoption
 on:
     workflow_dispatch:
         inputs:
@@ -23,7 +23,7 @@ on:
 jobs:
     update_tvl:
         runs-on: ubuntu-latest
-        name: "Add Adoption: ${{ github.event.inputs.slug }}"
+        name: "Add Immunefi Adoption: ${{ github.event.inputs.slug }}"
 
         steps:
             - uses: oNaiPs/secrets-to-env-action@v1
