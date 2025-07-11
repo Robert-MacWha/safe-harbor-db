@@ -1,0 +1,60 @@
+name: add_adoption
+on:
+    workflow_dispatch:
+        inputs:
+            immunefi-slug:
+                description: "Immunefi project slug"
+                required: true
+            defiliama-slug:
+                description: "Project defiliama slug"
+                required: true
+            chain:
+                description: "Adoption chain"
+                required: true
+            txhash:
+                description: "Adoption transaction hash"
+                required: true
+            proposalUri:
+                description: "Adoption proposal uri"
+            force:
+                description: "Force adoption addition"
+                type: boolean
+
+jobs:
+    update_tvl:
+        runs-on: ubuntu-latest
+        name: "Add Adoption: ${{ github.event.inputs.slug }}"
+
+        steps:
+            - uses: oNaiPs/secrets-to-env-action@v1
+              with:
+                secrets: ${{ toJSON(secrets) }}
+
+            - name: Cache Go Build
+              id: cache-go-build
+              uses: actions/cache@v4
+              with:
+                  path: main
+                  key: ${{ runner.os }}-go-build-${{ github.sha }}
+
+            - name: Checkout code
+              if: steps.cache-go-build.outputs.cache-hit != 'true'
+              uses: actions/checkout@v4
+
+            - name: Install golang
+              if: steps.cache-go-build.outputs.cache-hit != 'true'
+              uses: actions/setup-go@v5
+              with:
+                  go-version: 1.22.3
+
+            - name: Install dependencies
+              if: steps.cache-go-build.outputs.cache-hit != 'true'
+              run: go mod download
+
+            - name: Build the program
+              if: steps.cache-go-build.outputs.cache-hit != 'true'
+              run: go build -o main cmd/main/main.go
+
+            - name: Run the program
+              run: |
+                  ./main add-immunefi-adoption --immunefi-slug=${{ github.event.inputs.immunefi-slug }} --defiliama-slug=${{ github.event.inputs.defiliama-slug }} --chain=${{ github.event.inputs.chain }} --txhash=${{ github.event.inputs.txhash }} --adoptionProposalUri="${{ github.event.inputs.proposalUri || '' }}" --force=${{ github.event.inputs.force }} --prod=true
