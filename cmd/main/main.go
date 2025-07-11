@@ -461,6 +461,16 @@ func addAdoption(
 	}
 
 	slog.Info("Successfully added adoption to database")
+	// Send Telegram notification
+	telegramMessage := "🚨 New Safe Harbor Adoption\n\n"
+	telegramMessage += fmt.Sprintf("Protocol: %s\n", protocol.Name)
+	telegramMessage += fmt.Sprintf("URL: https://skylock.xyz/safeharbor/database/%s\n", protocol.Slug)
+
+	err = telegram.SendNotification(telegramMessage, os.Getenv("TELEGRAM_BOT_TOKEN"), os.Getenv("TELEGRAM_CHAT_ID"))
+	if err != nil {
+		slog.Error("Failed to send Telegram notification", "error", err)
+	}
+
 	return nil
 }
 
@@ -546,6 +556,15 @@ func addImmunefiAdoption(
 	}
 
 	slog.Info("Successfully added adoption to database")
+	// Send Telegram notification
+	telegramMessage := "🚨 New Immunefi Safe Harbor Adoption\n\n"
+	telegramMessage += fmt.Sprintf("Protocol: %s\n", protocol.Name)
+	telegramMessage += fmt.Sprintf("URL: https://skylock.xyz/safeharbor/database/%s\n", protocol.Slug)
+
+	err = telegram.SendNotification(telegramMessage, os.Getenv("TELEGRAM_BOT_TOKEN"), os.Getenv("TELEGRAM_CHAT_ID"))
+	if err != nil {
+		slog.Error("Failed to send Telegram notification", "error", err)
+	}
 	return nil
 }
 
