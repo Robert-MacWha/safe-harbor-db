@@ -162,6 +162,12 @@ func main() {
 
 	err := app.Run(os.Args)
 	if err != nil {
+		telegram.SendNotification(
+			fmt.Sprintf("Error running SHDB: %s", err),
+			os.Getenv("TELEGRAM_BOT_TOKEN"),
+			os.Getenv("TELEGRAM_CHAT_ID"),
+		)
+
 		slog.Error("app.Run", "error", err)
 		os.Exit(1)
 	}
