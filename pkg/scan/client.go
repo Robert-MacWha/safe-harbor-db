@@ -111,9 +111,4 @@ func (c *RateLimitedClient) InternalTxByAddress(address string, startBlock *int,
 // Sleep sleeps for the remaining time until the next call can be made.
 func (c *RateLimitedClient) sleep() {
 	time.Sleep(rateLimit)
-	// sleepTime := rateLimit - time.Since(c.lastCalled)
-	// if sleepTime > 0 {
-	// 	time.Sleep(sleepTime)
-	// }
-	// c.lastCalled = time.Now()
 }

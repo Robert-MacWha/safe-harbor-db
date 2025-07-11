@@ -1,0 +1,46 @@
+name: add_adoption
+on:
+    workflow_dispatch:
+
+    schedule:
+       # Runs daily at 9:00 PM UTC (4:00 PM EST, 5:00 PM EDT)
+        - cron: "0 21 * * *"
+
+jobs:
+    update_tvl:
+        runs-on: ubuntu-latest
+        name: "Add Adoption: ${{ github.event.inputs.slug }}"
+
+        steps:
+            - uses: oNaiPs/secrets-to-env-action@v1
+              with:
+                secrets: ${{ toJSON(secrets) }}
+
+            - name: Cache Go Build
+              id: cache-go-build
+              uses: actions/cache@v4
+              with:
+                  path: main
+                  key: ${{ runner.os }}-go-build-${{ github.sha }}
+
+            - name: Checkout code
+              if: steps.cache-go-build.outputs.cache-hit != 'true'
+              uses: actions/checkout@v4
+
+            - name: Install golang
+              if: steps.cache-go-build.outputs.cache-hit != 'true'
+              uses: actions/setup-go@v5
+              with:
+                  go-version: 1.22.3
+
+            - name: Install dependencies
+              if: steps.cache-go-build.outputs.cache-hit != 'true'
+              run: go mod download
+
+            - name: Build the program
+              if: steps.cache-go-build.outputs.cache-hit != 'true'
+              run: go build -o main cmd/main/main.go
+
+            - name: Run the program
+              run: |
+                  ./main check-new-adoptions --prod=true
