@@ -71,6 +71,7 @@ func (v *AgreementDetailsV1) FromRawAgreementDetails(d *adoptiondetails.Agreemen
 	v.Contact = formatContactDetails(d.ContactDetails)
 	v.Chains = make([]ChainV1, len(d.Chains))
 	v.BountyTerms = BountyTermsV1{}
+	v.AgreementURI = d.AgreementURI
 	if err := v.BountyTerms.fromRawBountyTerms(d.BountyTerms); err != nil {
 		return fmt.Errorf("fromRawBountyTerms: %w", err)
 	}

@@ -21,6 +21,7 @@ var ScanUrls = map[int]string{
 	56:    "https://api.bscscan.com/api?",
 	100:   "https://api.gnosisscan.io/api?",
 	137:   "https://api.polygonscan.com/api?",
+	324:   "https://block-explorer-api.mainnet.zksync.io/api?",
 	1101:  "https://api-zkevm.polygonscan.com/api?",
 	8453:  "https://api.basescan.org/api?",
 	17000: "https://api-holesky.etherscan.io/api?",
