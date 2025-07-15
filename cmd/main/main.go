@@ -411,7 +411,7 @@ func addAdoption(
 	}
 
 	scanClient, err := getScanClient(chain)
-	if err != nil {
+	if err == nil {
 		agreementDetails.TryNameAddresses(scanClient)
 	} else {
 		slog.Warn("getScanClient", "error", err)
@@ -459,7 +459,7 @@ func addAdoption(
 	// Send Telegram notification
 	telegramMessage := "🚨 New Safe Harbor Adoption\n\n"
 	telegramMessage += fmt.Sprintf("Protocol: %s\n", slug)
-	telegramMessage += fmt.Sprintf("URL: https://skylock.xyz/safeharbor/database/%s\n", slug)
+	telegramMessage += fmt.Sprintf("URL: https://safe-harbor-d9e89.web.app/database/%s\n", slug)
 
 	err = telegram.SendNotification(telegramMessage, os.Getenv("TELEGRAM_BOT_TOKEN"), os.Getenv("TELEGRAM_CHAT_ID"))
 	if err != nil {
@@ -516,7 +516,7 @@ func addImmunefiAdoption(
 	// Send Telegram notification
 	telegramMessage := "🚨 New Immunefi Safe Harbor Adoption\n\n"
 	telegramMessage += fmt.Sprintf("Protocol: %s\n", slug)
-	telegramMessage += fmt.Sprintf("URL: https://skylock.xyz/safeharbor/database/%s\n", slug)
+	telegramMessage += fmt.Sprintf("URL: https://safe-harbor-d9e89.web.app/%s\n", slug)
 
 	err = telegram.SendNotification(telegramMessage, os.Getenv("TELEGRAM_BOT_TOKEN"), os.Getenv("TELEGRAM_CHAT_ID"))
 	if err != nil {
