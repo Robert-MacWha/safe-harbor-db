@@ -4,6 +4,7 @@ import (
 	"SHDB/pkg/contracts/adoptiondetails"
 	"SHDB/pkg/scan"
 	"fmt"
+	"log/slog"
 )
 
 const (
@@ -92,6 +93,10 @@ func (v *AgreementDetailsV1) TryNameAddresses(client scan.Client) {
 			name := client.ContractName(account.Address)
 			account.Name = name
 			v.Chains[i].Accounts[j] = account
+
+			if name == "" {
+				slog.Info("Naming address failed", "address", account.Address, "chainID", chain.ID)
+			}
 		}
 	}
 }

@@ -412,6 +412,7 @@ func addAdoption(
 
 	scanClient, err := getScanClient(chain)
 	if err == nil {
+		slog.Info("Naming addresses...")
 		agreementDetails.TryNameAddresses(scanClient)
 	} else {
 		slog.Warn("getScanClient", "error", err)
