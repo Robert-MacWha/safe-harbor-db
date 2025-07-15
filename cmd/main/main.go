@@ -374,7 +374,13 @@ func addAdoption(
 ) error {
 	protocol, err := defiliama.GetProtocol(slug)
 	if err != nil {
-		return fmt.Errorf("defiliama.GetProtocol(slug=%v): %w", slug, err)
+		slog.Error("defiliama.GetProtocol", "slug", slug, "error", err)
+		slog.Info("Falling back to no Defiliama protocol data")
+
+		protocol = types.Protocol{
+			Slug: slug,
+			Name: slug,
+		}
 	}
 
 	// Fetch safe harbor adoption from blockchain
