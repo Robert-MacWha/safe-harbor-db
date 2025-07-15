@@ -481,7 +481,13 @@ func addImmunefiAdoption(
 ) error {
 	protocol, err := defiliama.GetProtocol(defiliamaSlug)
 	if err != nil {
-		return fmt.Errorf("defiliama.GetProtocol(slug=%v): %w", defiliamaSlug, err)
+		slog.Error("defiliama.GetProtocol", "slug", defiliamaSlug, "error", err)
+		slog.Info("Falling back to no Defiliama protocol data")
+
+		protocol = types.Protocol{
+			Slug: defiliamaSlug,
+			Name: defiliamaSlug,
+		}
 	}
 
 	// Fetch safe harbor agreement from Immunefi
