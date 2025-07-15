@@ -25,15 +25,19 @@ type Client interface {
 }
 
 type RateLimitedClient struct {
-	api *etherscan.Client
-
-	lastCalled time.Time
+	client *etherscan.Client
 }
 
 const rateLimit = 200 * time.Millisecond
 
-func NewRateLimitedClient(api *etherscan.Client) *RateLimitedClient {
-	return &RateLimitedClient{api: api}
+func NewRateLimitedClient(apiKey string, baseURL string) *RateLimitedClient {
+	client := etherscan.NewCustomized(etherscan.Customization{
+		Timeout: 30 * time.Second,
+		Key:     apiKey,
+		BaseURL: baseURL,
+	})
+
+	return &RateLimitedClient{client}
 }
 
 func (c *RateLimitedClient) ContractName(address string) (name string) {
@@ -48,7 +52,7 @@ func (c *RateLimitedClient) ContractName(address string) (name string) {
 func (c *RateLimitedClient) ContractSource(address string) (source etherscan.ContractSource, err error) {
 	defer c.sleep()
 
-	sources, err := c.api.ContractSource(address)
+	sources, err := c.client.ContractSource(address)
 	if err != nil {
 		return etherscan.ContractSource{}, err
 	}
@@ -63,7 +67,7 @@ func (c *RateLimitedClient) ContractSource(address string) (source etherscan.Con
 func (c *RateLimitedClient) NormalTxByAddress(address string, startBlock *int, endBlock *int, page int, offset int, desc bool) (txs []Tx, err error) {
 	defer c.sleep()
 
-	normalTxns, err := c.api.NormalTxByAddress(address, startBlock, endBlock, page, offset, desc)
+	normalTxns, err := c.client.NormalTxByAddress(address, startBlock, endBlock, page, offset, desc)
 	if err != nil {
 		return nil, err
 	}
@@ -87,7 +91,7 @@ func (c *RateLimitedClient) NormalTxByAddress(address string, startBlock *int, e
 func (c *RateLimitedClient) InternalTxByAddress(address string, startBlock *int, endBlock *int, page int, offset int, desc bool) (txs []Tx, err error) {
 	defer c.sleep()
 
-	internalTxns, err := c.api.InternalTxByAddress(address, startBlock, endBlock, page, offset, desc)
+	internalTxns, err := c.client.InternalTxByAddress(address, startBlock, endBlock, page, offset, desc)
 	if err != nil {
 		return nil, err
 	}

@@ -6,18 +6,17 @@ import (
 	"SHDB/pkg/defiliama"
 	"SHDB/pkg/firebase"
 	"SHDB/pkg/immunefi"
+	"SHDB/pkg/scan"
 	"SHDB/pkg/telegram"
+	"SHDB/pkg/types"
 	"context"
 	"fmt"
 	"log/slog"
-	"math/big"
 	"os"
-	"time"
 
 	"cloud.google.com/go/firestore"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/joho/godotenv"
 	"github.com/lmittmann/tint"
@@ -373,7 +372,6 @@ func addAdoption(
 	adoptionProposalUri string,
 	force bool,
 ) error {
-	// Fetch defiliama data for protocol
 	protocol, err := defiliama.GetProtocol(slug)
 	if err != nil {
 		return fmt.Errorf("defiliama.GetProtocol(slug=%v): %w", slug, err)
@@ -390,58 +388,49 @@ func addAdoption(
 		return fmt.Errorf("rpc.TransactionReceipt: %w", err)
 	}
 
-	sender, err := types.Sender(types.NewLondonSigner(big.NewInt(int64(chain))), txbody)
+	sender, err := eClient.TransactionSender(context.Background(), txbody, receipt.BlockHash, receipt.TransactionIndex)
 	if err != nil {
 		return fmt.Errorf("types.Sender: %w", err)
 	}
 
-	agreementAddress, agreement, err := safeharbor.GetAgreement(txhash, eClient)
+	agreementAddress, rawAgreement, err := safeharbor.GetAgreement(txhash, eClient)
 	if err != nil {
 		return fmt.Errorf("getAgreement: %w", err)
 	}
 
-	//* Upload protocol & adoption to firestore if not already present
-	// Check if protocol exists
-	protocolDocRef := fClient.Collection(protocolCol).Doc(protocol.Slug)
-	protocolDoc, err := protocolDocRef.Get(context.Background())
-	if err != nil && status.Code(err) != codes.NotFound {
-		return fmt.Errorf("firestore.Get: %w", err)
-	}
-
-	exists := protocolDoc.Exists()
-	if exists && !force {
-		return fmt.Errorf("protocol already exists in firestore. Use --force to overwrite")
-	}
-
-	// Upload protocol
-	fProtocol := firebase.Protocol{
-		Name:     protocol.Name,
-		Slug:     protocol.Slug,
-		Website:  protocol.Website,
-		Icon:     protocol.Icon,
-		TVL:      protocol.TVL,
-		Category: protocol.Category,
-	}
-	slog.Info("Uploading protocol", "protocol", fProtocol.Name)
-	_, err = protocolDocRef.Set(context.Background(), fProtocol)
+	agreementDetails := types.AgreementDetailsV1{}
+	err = agreementDetails.FromRawAgreementDetails(rawAgreement)
 	if err != nil {
-		return fmt.Errorf("firestore.Set: %w", err)
+		return fmt.Errorf("FromRawAgreementDetails: %w", err)
+	}
+
+	scanClient, err := getScanClient(chain)
+	if err != nil {
+		agreementDetails.TryNameAddresses(scanClient)
+	} else {
+		slog.Warn("getScanClient", "error", err)
+	}
+
+	//* Upload protocol & adoption to firestore if not already present
+	protocolDocRef, err := uploadProtocol(fClient, protocol, protocolCol, force)
+	if err != nil {
+		return fmt.Errorf("uploadProtocol: %w", err)
 	}
 
 	// Create safe harbor adoption
-	fAdoption := firebase.SafeHarborAgreement{
-		Protocol:            protocolDocRef,
-		RegistryTransaction: txhash.String(),
-		RegistryChainId:     fmt.Sprintf("%d", chain),
+	fAdoption := types.SafeHarborAgreementV1{
+		SafeHarborAgreementBase: types.SafeHarborAgreementBase{
+			AdoptionProposalURI: adoptionProposalUri,
+			Protocol:            protocolDocRef,
+			Slug:                "onchain-" + txhash.String(),
+			Version:             types.SealV1,
+		},
+		AgreementDetails:    agreementDetails,
 		AgreementAddress:    agreementAddress.String(),
-		Entity:              sender.String(),
-		AgreementURI:        agreement.AgreementURI,
-		AdoptionProposalURI: adoptionProposalUri,
-		ContactDetails:      firebase.FormatContactDetails(agreement.ContactDetails),
-		Chains:              firebase.FormatChains(agreement.Chains),
-		BountyTerms:         firebase.FormatBountyTerms(agreement.BountyTerms),
 		CreatedAt:           txbody.Time(),
-		CreatedBlock:        int(receipt.BlockNumber.Int64()),
+		Creator:             sender.String(),
+		RegistryTransaction: txhash.String(),
+		RegistryChainID:     chain,
 	}
 
 	// Upload safe harbor adoption
@@ -454,8 +443,8 @@ func addAdoption(
 
 	// Update protocol with safe harbor agreement reference
 	slog.Info("Updating protocol with safe harbor agreement reference")
-	fProtocol.SafeHarborAgreement = agreementDocRef
-	_, err = protocolDocRef.Set(context.Background(), fProtocol)
+	protocol.SafeHarborAgreement = agreementDocRef
+	_, err = protocolDocRef.Set(context.Background(), protocol)
 	if err != nil {
 		return fmt.Errorf("firestore.Set: %w", err)
 	}
@@ -463,8 +452,8 @@ func addAdoption(
 	slog.Info("Successfully added adoption to database")
 	// Send Telegram notification
 	telegramMessage := "🚨 New Safe Harbor Adoption\n\n"
-	telegramMessage += fmt.Sprintf("Protocol: %s\n", protocol.Name)
-	telegramMessage += fmt.Sprintf("URL: https://skylock.xyz/safeharbor/database/%s\n", protocol.Slug)
+	telegramMessage += fmt.Sprintf("Protocol: %s\n", slug)
+	telegramMessage += fmt.Sprintf("URL: https://skylock.xyz/safeharbor/database/%s\n", slug)
 
 	err = telegram.SendNotification(telegramMessage, os.Getenv("TELEGRAM_BOT_TOKEN"), os.Getenv("TELEGRAM_CHAT_ID"))
 	if err != nil {
@@ -483,7 +472,6 @@ func addImmunefiAdoption(
 	defiliamaSlug string,
 	force bool,
 ) error {
-	// Fetch defiliama data for protocol
 	protocol, err := defiliama.GetProtocol(defiliamaSlug)
 	if err != nil {
 		return fmt.Errorf("defiliama.GetProtocol(slug=%v): %w", defiliamaSlug, err)
@@ -496,61 +484,24 @@ func addImmunefiAdoption(
 	}
 
 	//* Upload protocol & adoption to firestore if not already present
-	// Check if protocol exists
-	protocolDocRef := fClient.Collection(protocolCol).Doc(protocol.Slug)
-	protocolDoc, err := protocolDocRef.Get(context.Background())
-	if err != nil && status.Code(err) != codes.NotFound {
-		return fmt.Errorf("firestore.Get: %w", err)
-	}
-
-	exists := protocolDoc.Exists()
-	if exists && !force {
-		return fmt.Errorf("protocol already exists in firestore. Use --force to overwrite")
-	}
-
-	// Upload protocol
-	fProtocol := firebase.Protocol{
-		Name:     protocol.Name,
-		Slug:     protocol.Slug,
-		Website:  protocol.Website,
-		Icon:     protocol.Icon,
-		TVL:      protocol.TVL,
-		Category: protocol.Category,
-	}
-	slog.Info("Uploading protocol", "protocol", fProtocol.Name)
-	_, err = protocolDocRef.Set(context.Background(), fProtocol)
+	protocolDocRef, err := uploadProtocol(fClient, protocol, protocolCol, force)
 	if err != nil {
-		return fmt.Errorf("firestore.Set: %w", err)
-	}
-
-	// Create safe harbor adoption
-	fAdoption := firebase.SafeHarborAgreement{
-		Protocol:            protocolDocRef,
-		RegistryTransaction: "",
-		RegistryChainId:     "",
-		AgreementAddress:    "",
-		Entity:              "",
-		AgreementURI:        agreement.AgreementURI, // TODO - Immunefi URL
-		AdoptionProposalURI: "",
-		ContactDetails:      agreement.AgreementURI, // TODO - Immunefi URL
-		Chains:              agreement.Chains,
-		BountyTerms:         agreement.BountyTerms,
-		CreatedAt:           time.Now(),
-		CreatedBlock:        0,
+		return fmt.Errorf("uploadProtocol: %w", err)
 	}
 
 	// Upload safe harbor adoption
-	slog.Info("Uploading adoption", "adoption", agreement.Slug)
-	agreementDocRef := fClient.Collection(agreementCol).Doc(agreement.Slug)
-	_, err = agreementDocRef.Set(context.Background(), fAdoption)
+	slug := "immunefi-" + immunefiSlug
+	slog.Info("Uploading adoption", "adoption", slug)
+	agreementDocRef := fClient.Collection(agreementCol).Doc(slug)
+	_, err = agreementDocRef.Set(context.Background(), agreement)
 	if err != nil {
 		return fmt.Errorf("firestore.Set: %w", err)
 	}
 
 	// Update protocol with safe harbor agreement reference
 	slog.Info("Updating protocol with safe harbor agreement reference")
-	fProtocol.SafeHarborAgreement = agreementDocRef
-	_, err = protocolDocRef.Set(context.Background(), fProtocol)
+	protocol.SafeHarborAgreement = agreementDocRef
+	_, err = protocolDocRef.Set(context.Background(), protocol)
 	if err != nil {
 		return fmt.Errorf("firestore.Set: %w", err)
 	}
@@ -558,8 +509,8 @@ func addImmunefiAdoption(
 	slog.Info("Successfully added adoption to database")
 	// Send Telegram notification
 	telegramMessage := "🚨 New Immunefi Safe Harbor Adoption\n\n"
-	telegramMessage += fmt.Sprintf("Protocol: %s\n", protocol.Name)
-	telegramMessage += fmt.Sprintf("URL: https://skylock.xyz/safeharbor/database/%s\n", protocol.Slug)
+	telegramMessage += fmt.Sprintf("Protocol: %s\n", slug)
+	telegramMessage += fmt.Sprintf("URL: https://skylock.xyz/safeharbor/database/%s\n", slug)
 
 	err = telegram.SendNotification(telegramMessage, os.Getenv("TELEGRAM_BOT_TOKEN"), os.Getenv("TELEGRAM_CHAT_ID"))
 	if err != nil {
@@ -585,7 +536,7 @@ func refreshTvl(
 	}
 
 	//* Get the slug from the document
-	var protocol firebase.Protocol
+	var protocol types.Protocol
 	err = protocolDoc.DataTo(&protocol)
 	if err != nil {
 		return fmt.Errorf("firestore.DataTo: %w", err)
@@ -730,6 +681,28 @@ func checkChainForAdoptions(chainId int) ([]string, error) {
 	return adoptions, nil
 }
 
+func uploadProtocol(fClient *firestore.Client, protocol types.Protocol, protocolCol string, force bool) (*firestore.DocumentRef, error) {
+	// Check if protocol exists
+	protocolDocRef := fClient.Collection(protocolCol).Doc(protocol.Slug)
+	protocolDoc, err := protocolDocRef.Get(context.Background())
+	if err != nil && status.Code(err) != codes.NotFound {
+		return nil, fmt.Errorf("firestore.Get: %w", err)
+	}
+
+	exists := protocolDoc.Exists()
+	if exists && !force {
+		return nil, fmt.Errorf("protocol already exists in firestore. Use --force to overwrite")
+	}
+
+	slog.Info("Uploading protocol", "protocol", protocol.Name)
+	_, err = protocolDocRef.Set(context.Background(), protocol)
+	if err != nil {
+		return nil, fmt.Errorf("firestore.Set: %w", err)
+	}
+
+	return protocolDocRef, nil
+}
+
 func getChainClient(chain int) (*ethclient.Client, error) {
 	chainCfg, err := config.LoadChainCfg()
 	if err != nil {
@@ -745,6 +718,20 @@ func getChainClient(chain int) (*ethclient.Client, error) {
 		return nil, fmt.Errorf("rpc.Dial: %w", err)
 	}
 	return eClient, nil
+}
+
+func getScanClient(chain int) (scan.Client, error) {
+	chainCfg, err := config.LoadChainCfg()
+	if err != nil {
+		return nil, fmt.Errorf("LoadChainCfg: %w", err)
+	}
+
+	if _, exists := chainCfg[chain]; !exists {
+		return nil, fmt.Errorf("chain ID not found in chain config: %d", chain)
+	}
+
+	scanClient := scan.NewRateLimitedClient(chainCfg[chain].ScanKey, chainCfg[chain].ScanUrl)
+	return scanClient, nil
 }
 
 func getCollectionNames(cCtx *cli.Context) (protocolCol string, agreementCol string) {

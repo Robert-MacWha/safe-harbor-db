@@ -1,6 +1,7 @@
 package defiliama
 
 import (
+	"SHDB/pkg/types"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -58,24 +59,24 @@ func GetTvl(slug string) (float64, error) {
 	return lastTvl, nil
 }
 
-func GetProtocol(slug string) (Protocol, error) {
+func GetProtocol(slug string) (types.Protocol, error) {
 	resp, err := http.Get(fmt.Sprintf("https://api.llama.fi/protocol/%s", slug))
 	if err != nil {
-		return Protocol{}, fmt.Errorf("http.Get: %w", err)
+		return types.Protocol{}, fmt.Errorf("http.Get: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return Protocol{}, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+		return types.Protocol{}, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
 	}
 
 	var details protocolDetail
 	err = json.NewDecoder(resp.Body).Decode(&details)
 	if err != nil {
-		return Protocol{}, fmt.Errorf("json.Decode: %w", err)
+		return types.Protocol{}, fmt.Errorf("json.Decode: %w", err)
 	}
 
-	return Protocol{
+	return types.Protocol{
 		Name:     details.Name,
 		Slug:     slug,
 		Website:  details.URL,

@@ -2,7 +2,7 @@ package immunefi
 
 import (
 	"SHDB/pkg/config"
-	"SHDB/pkg/firebase"
+	"SHDB/pkg/types"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -13,14 +13,6 @@ import (
 
 type Client struct {
 	buildId string
-}
-
-type AdoptionDetails struct {
-	Slug         string
-	AgreementURI string
-	ProtocolName string
-	Chains       []firebase.Chain
-	BountyTerms  firebase.BountyTerms
 }
 
 type basicImmunefiBountyResp struct {
@@ -77,7 +69,7 @@ func NewClient() (*Client, error) {
 
 // GetAgreements fetches all immunefi protocols that have safe harbor agreements
 // and returns their slugs.
-func (c *Client) GetAgreements() ([]AdoptionDetails, error) {
+func (c *Client) GetAgreements() ([]types.SafeHarborAgreementImmunefiV1, error) {
 	basicBounties, err := c.getBasicBounties()
 	if err != nil {
 		return nil, fmt.Errorf("getBasicBounties: %w", err)
@@ -97,22 +89,22 @@ func (c *Client) GetAgreements() ([]AdoptionDetails, error) {
 		}
 	}
 
-	agreementDetails := make([]AdoptionDetails, 0, len(detailedBounties))
+	agreementDetails := make([]types.SafeHarborAgreementImmunefiV1, 0, len(detailedBounties))
 	for _, bounty := range detailedBounties {
-		agreementDetails = append(agreementDetails, bounty.toAdoptionDetails())
+		agreementDetails = append(agreementDetails, bounty.toSafeHarborAgreement())
 	}
 
 	return agreementDetails, nil
 }
 
-func (c *Client) GetAgreement(protocolId string) (*AdoptionDetails, error) {
+func (c *Client) GetAgreement(protocolId string) (*types.SafeHarborAgreementImmunefiV1, error) {
 	detailedBounty, err := c.getDetailedBounty(protocolId)
 	if err != nil {
 		return nil, fmt.Errorf("getDetailedBounty(%s): %w", protocolId, err)
 	}
 
-	agreementDetails := detailedBounty.toAdoptionDetails()
-	return &agreementDetails, nil
+	safeHarborAgreement := detailedBounty.toSafeHarborAgreement()
+	return &safeHarborAgreement, nil
 }
 
 func (c *Client) getBasicBounties() ([]basicImmunefiBounty, error) {
@@ -161,32 +153,38 @@ func (c *Client) getDetailedBounty(bountyId string) (*detailedImmunefiBounty, er
 	return &iResp.PageProps.Bounty, nil
 }
 
-func (d detailedImmunefiBounty) toAdoptionDetails() AdoptionDetails {
-	chains := map[int]firebase.Chain{}
+func (d detailedImmunefiBounty) toSafeHarborAgreement() types.SafeHarborAgreementImmunefiV1 {
+	chains := map[int]types.ImmunefiChainV1{}
 
-	agreementDetails := AdoptionDetails{
-		Slug:         fmt.Sprintf("immunefi-%s", d.Slug),
-		ProtocolName: d.Project,
-		AgreementURI: fmt.Sprintf("https://immunefi.com/bug-bounty/%s/safe-harbor/", d.Slug),
-		BountyTerms: firebase.BountyTerms{
-			Retainable:            false,
-			Identity:              firebase.IdentityNamed,
-			DiligenceRequirements: "Diligence performed by Immunefi, including creating an account on their website and submitting a report through their platform",
+	safeHarborAgreement := types.SafeHarborAgreementImmunefiV1{
+		SafeHarborAgreementBase: types.SafeHarborAgreementBase{
+			AdoptionProposalURI: fmt.Sprintf("https://immunefi.com/bug-bounty/%s/safe-harbor/", d.Slug),
+			Slug:                "immunefi-" + d.Slug,
+			Version:             types.ImmunefiV1,
+		},
+		AgreementDetails: types.ImmunefiDetailsV1{
+			Name:    d.Project,
+			Contact: fmt.Sprintf("https://immunefi.com/bug-bounty/%s/safe-harbor/", d.Slug),
+			BountyTerms: types.BountyTermsV1{
+				Retainable:            false,
+				Identity:              types.IdentityNamed,
+				DiligenceRequirements: "Diligence performed by Immunefi, including creating an account on their website and submitting a report through their platform",
+			},
 		},
 	}
 
 	for _, asset := range d.Assets {
-		parseImmunefiAsset(asset, chains, agreementDetails)
+		addAssetToChain(asset, chains)
 	}
 
 	for _, chain := range chains {
-		agreementDetails.Chains = append(agreementDetails.Chains, chain)
+		safeHarborAgreement.AgreementDetails.Chains = append(safeHarborAgreement.AgreementDetails.Chains, chain)
 	}
 
-	return agreementDetails
+	return safeHarborAgreement
 }
 
-func parseImmunefiAsset(asset detailedImmunefiBountyAsset, chains map[int]firebase.Chain, agreementDetails AdoptionDetails) {
+func addAssetToChain(asset detailedImmunefiBountyAsset, chains map[int]types.ImmunefiChainV1) {
 	if asset.Type != "smart_contract" {
 		return
 	}
@@ -197,20 +195,18 @@ func parseImmunefiAsset(asset detailedImmunefiBountyAsset, chains map[int]fireba
 		return
 	}
 
-	account := firebase.Account{
-		Name:               asset.Description,
-		Address:            address,
-		ChildContractScope: firebase.ChildContractScopeNone,
+	account := types.ImmunefiAccountV1{
+		Name:    asset.Description,
+		Address: address,
 	}
 
 	chain, exists := chains[chainId]
 	if exists {
 		chain.Accounts = append(chain.Accounts, account)
 	} else {
-		chain = firebase.Chain{
-			ID:                   chainId,
-			AssetRecoveryAddress: agreementDetails.AgreementURI,
-			Accounts:             []firebase.Account{account},
+		chain = types.ImmunefiChainV1{
+			ID:       chainId,
+			Accounts: []types.ImmunefiAccountV1{account},
 		}
 	}
 
