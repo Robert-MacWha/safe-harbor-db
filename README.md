@@ -1,9 +1,2 @@
 # SHDB
-
-## Adding private modules
-
-To go get the arianrhod module, make sure your terminal is logged into github via ssh, then run `export GOPRIVATE=github.com/Skylock-ai`. From there you can run `go mod tidy` as normal.
-
-## Infrastructure
-
-SHDB infrastructure is managed by ansible playbooks and github workflows. See [infrastructure](./infrastructure/README.md) for more info.
+Github actions to maintain the off-chain safe harbor database in firestore.  Currently deployed to https://skylock.xyz/safeharbor/database, migration in progress to https://safeharbor.securityalliance.org.
