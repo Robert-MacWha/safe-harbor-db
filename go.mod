@@ -6,6 +6,7 @@ toolchain go1.23.4
 
 require (
 	cloud.google.com/go/firestore v1.16.0
+	firebase.google.com/go v3.13.0+incompatible
 	github.com/ethereum/go-ethereum v1.14.6
 	github.com/joho/godotenv v1.5.1
 	github.com/lmittmann/tint v1.0.6
@@ -23,7 +24,6 @@ require (
 	cloud.google.com/go/iam v1.1.12 // indirect
 	cloud.google.com/go/longrunning v0.5.11 // indirect
 	cloud.google.com/go/storage v1.41.0 // indirect
-	firebase.google.com/go v3.13.0+incompatible // indirect
 	github.com/DataDog/zstd v1.5.2 // indirect
 	github.com/Microsoft/go-winio v0.6.2 // indirect
 	github.com/bits-and-blooms/bitset v1.10.0 // indirect

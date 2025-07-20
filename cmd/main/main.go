@@ -3,6 +3,7 @@ package main
 import (
 	"SHDB/pkg/config"
 	"SHDB/pkg/contracts/safeharbor"
+	"SHDB/pkg/deduab"
 	"SHDB/pkg/defiliama"
 	"SHDB/pkg/firebase"
 	"SHDB/pkg/immunefi"
@@ -13,6 +14,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"time"
 
 	"cloud.google.com/go/firestore"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -32,6 +34,7 @@ const (
 
 const EtherscanErrNoTxns string = "etherscan server: No transactions found"
 
+// TODO: Add refresh-contract-names command
 func main() {
 	app := &cli.App{
 		Name:  "shdb",
@@ -119,14 +122,21 @@ func main() {
 			},
 			{
 				Name:   "refresh-child-contracts",
-				Usage:  "Refresh the child contracts of an agreement in the database",
+				Usage:  "Refresh the child contracts of all agreements in the database",
 				Action: runRefreshChildContracts,
 				Flags: []cli.Flag{
-					&cli.StringFlag{
-						Name:     "slug",
-						Usage:    "Defiliama slug of the protocol. If 'all', refreshes all protocols",
-						Required: true,
+					&cli.BoolFlag{
+						Name:  "prod",
+						Usage: "Run in production mode. If false, writes to a test collection",
+						Value: false,
 					},
+				},
+			},
+			{
+				Name:   "refresh-adoption-dates",
+				Usage:  "Refreshes the adoption dates of all agreements in the database",
+				Action: runRefreshAdoptionDates,
+				Flags: []cli.Flag{
 					&cli.BoolFlag{
 						Name:  "prod",
 						Usage: "Run in production mode. If false, writes to a test collection",
@@ -272,21 +282,15 @@ func runRefreshChildContracts(cCtx *cli.Context) error {
 	_ = godotenv.Load()
 
 	//* Load config
-	slug := cCtx.String("slug")
-	protocolCol, agreementCol := getCollectionNames(cCtx)
+	_, agreementCol := getCollectionNames(cCtx)
 
 	fClient, err := firebase.NewFirestoreClient()
 	if err != nil {
 		return fmt.Errorf("NewFirestoreClient: %w", err)
 	}
 
-	//* Refresh single protocol
-	if slug != "all" {
-		return refreshChildContracts(fClient, protocolCol, agreementCol, slug)
-	}
-
 	//* Refresh all protocols
-	protocols := fClient.Collection(protocolCol)
+	protocols := fClient.Collection(agreementCol)
 	documents, err := protocols.Documents(context.Background()).GetAll()
 	if err != nil {
 		return fmt.Errorf("firestore.GetAll: %w", err)
@@ -294,7 +298,36 @@ func runRefreshChildContracts(cCtx *cli.Context) error {
 
 	for _, doc := range documents {
 		slug := doc.Ref.ID
-		err = refreshChildContracts(fClient, protocolCol, agreementCol, slug)
+		slog.Info("Refreshing child contracts for agreement", "slug", slug)
+		err = refreshChildContracts(fClient, agreementCol, slug)
+		if err != nil {
+			slog.Warn("refreshChildContracts", "error", err)
+		}
+	}
+
+	return nil
+}
+
+func runRefreshAdoptionDates(cCtx *cli.Context) error {
+	_ = godotenv.Load()
+
+	_, agreementCol := getCollectionNames(cCtx)
+
+	fClient, err := firebase.NewFirestoreClient()
+	if err != nil {
+		return fmt.Errorf("NewFirestoreClient: %w", err)
+	}
+
+	agreements := fClient.Collection(agreementCol)
+	documents, err := agreements.Documents(context.Background()).GetAll()
+	if err != nil {
+		return fmt.Errorf("firestore.GetAll: %w", err)
+	}
+
+	for _, doc := range documents {
+		slug := doc.Ref.ID
+		slog.Info("Refreshing adoption date for agreement", "slug", slug)
+		err = refreshAdoptionDate(fClient, agreementCol, slug)
 		if err != nil {
 			slog.Warn("refreshChildContracts", "error", err)
 		}
@@ -579,12 +612,93 @@ func refreshTvl(
 
 func refreshChildContracts(
 	fClient *firestore.Client,
-	protocolCol string,
 	agreementCol string,
 	slug string,
 ) error {
-	_, _, _, _ = fClient, protocolCol, agreementCol, slug
-	return fmt.Errorf("refreshChildContracts not implemented - issue #16")
+	var dClient = deduab.NewClient()
+	var doc, err = fClient.Collection(agreementCol).Doc(slug).Get(context.Background())
+	if err != nil {
+		return fmt.Errorf("firestore.Get: %w", err)
+	}
+
+	var version types.AgreementVersion
+	if err := doc.DataTo(&version); err != nil {
+		return fmt.Errorf("firestore.DataTo(version): %w", err)
+	}
+
+	switch version.Version {
+	case types.SealV1:
+		err := refreshChildContractSealV1(doc, dClient)
+		if err != nil {
+			return fmt.Errorf("refreshChildContractSealV1: %w", err)
+		}
+
+	case types.ImmunefiV1:
+		return nil // ImmunefiV1 does not have child contracts to refresh
+	default:
+		slog.Warn("refreshChildContracts not implemented", "version", version.Version, "slug", slug)
+		return nil
+	}
+
+	return nil
+}
+
+func refreshAdoptionDate(
+	fClient *firestore.Client,
+	agreementCol string,
+	slug string,
+) error {
+	doc, err := fClient.Collection(agreementCol).Doc(slug).Get(context.Background())
+	if err != nil {
+		return fmt.Errorf("firestore.Get: %w", err)
+	}
+
+	var version types.AgreementVersion
+	if err := doc.DataTo(&version); err != nil {
+		return fmt.Errorf("firestore.DataTo(version): %w", err)
+	}
+
+	switch version.Version {
+	case types.SealV1:
+		var agreement types.SafeHarborAgreementV1
+		if err := doc.DataTo(&agreement); err != nil {
+			return fmt.Errorf("firestore.DataTo(seal v1): %w", err)
+		}
+
+		eClient, err := getChainClient(agreement.RegistryChainID)
+		if err != nil {
+			return fmt.Errorf("getChainClient: %w", err)
+		}
+
+		tx := agreement.RegistryTransaction
+		txHash := common.HexToHash(tx)
+		txBody, err := eClient.TransactionReceipt(context.Background(), txHash)
+		if err != nil {
+			return fmt.Errorf("rpc.TransactionByHash: %w", err)
+		}
+
+		agreement.CreatedBlock = int(txBody.BlockNumber.Int64())
+
+		block, err := eClient.BlockByNumber(context.Background(), txBody.BlockNumber)
+		if err != nil {
+			return fmt.Errorf("rpc.BlockByNumber: %w", err)
+		}
+
+		agreement.CreatedAt = time.UnixMilli(int64(block.Time() * 1000))
+
+		// Update the document with the value of agreement
+		_, err = doc.Ref.Set(context.Background(), agreement)
+		if err != nil {
+			return fmt.Errorf("firestore.Set: %w", err)
+		}
+	case types.ImmunefiV1:
+		return nil
+	default:
+		slog.Error("refreshAdoptionDate not implemented", "version", version.Version, "slug", slug)
+		return nil
+	}
+
+	return nil
 }
 
 func checkNewImmunefiAdoptions(iClient *immunefi.Client, fClient *firestore.Client, agreementCol string) ([]string, error) {
@@ -692,6 +806,50 @@ func checkChainForAdoptions(chainId int) ([]string, error) {
 	}
 
 	return adoptions, nil
+}
+
+func refreshChildContractSealV1(doc *firestore.DocumentSnapshot, dClient *deduab.Client) error {
+	var agreement types.SafeHarborAgreementV1
+	if err := doc.DataTo(&agreement); err != nil {
+		return fmt.Errorf("firestore.DataTo(seal v1): %w", err)
+	}
+
+	for i, chain := range agreement.AgreementDetails.Chains {
+		for j, account := range chain.Accounts {
+			var endBlock int
+
+			switch account.ChildContractScope {
+			case types.ChildContractScopeAll:
+				endBlock = 2147483647 // Nax for API
+			case types.ChildContractScopeExistingOnly:
+				endBlock = agreement.CreatedBlock
+			default:
+				continue
+			}
+
+			childContracts, err := dClient.GetDeployed(account.Address, endBlock, 32767, endBlock, 200)
+			if err != nil {
+				slog.Warn("GetDeployed", "address", account.Address, "error", err)
+			}
+
+			account.Children = make([]types.ChildAccountV1, 0, len(childContracts))
+			for _, child := range childContracts {
+				account.Children = append(account.Children, types.ChildAccountV1{
+					Address: child.Address,
+					Name:    child.Name,
+				})
+			}
+
+			agreement.AgreementDetails.Chains[i].Accounts[j] = account
+		}
+	}
+
+	_, err := doc.Ref.Set(context.Background(), agreement)
+	if err != nil {
+		return fmt.Errorf("firestore.Set: %w", err)
+	}
+
+	return nil
 }
 
 func uploadProtocol(fClient *firestore.Client, protocol types.Protocol, protocolCol string, force bool) (*firestore.DocumentRef, error) {

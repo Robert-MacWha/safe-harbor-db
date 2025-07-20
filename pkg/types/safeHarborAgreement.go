@@ -26,6 +26,7 @@ type SafeHarborAgreementV1 struct {
 	AgreementAddress    string             `firestore:"agreementAddress"`
 	AgreementDetails    AgreementDetailsV1 `firestore:"agreementDetails"`
 	CreatedAt           time.Time          `firestore:"createdAt"`
+	CreatedBlock        int                `firestore:"createdBlock"`
 	Creator             string             `firestore:"creator"`
 	RegistryChainID     int                `firestore:"registryChainId"`
 	RegistryTransaction string             `firestore:"registryTransaction"`
