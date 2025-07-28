@@ -1,10 +1,7 @@
 name: update_children
 on:
     workflow_dispatch:
-        inputs:
-            slug:
-                description: "Defiliama protocol slug. If 'all' refreshes all protocols"
-                required: true
+
     schedule:
         # Runs daily at 10:25 AM UTC (5:25 AM EST)
         # Odd time used to avoid conflicts with other workflows
@@ -46,4 +43,4 @@ jobs:
               run: go build -o main cmd/main/main.go
 
             - name: Run the program
-              run: ./main refresh-child-contracts --slug=${{ github.event.inputs.slug || 'all' }} --prod=true
+              run: ./main refresh-child-contracts --prod=true
