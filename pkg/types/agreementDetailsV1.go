@@ -134,7 +134,7 @@ func (b *BountyTermsV1) fromRawBountyTerms(bounty adoptiondetails.BountyTerms) e
 		return fmt.Errorf("invalid identity: %d", bounty.Identity)
 	}
 
-	b.BountyCapUSD = int(bounty.BountyPercentage.Int64())
+	b.BountyCapUSD = int(bounty.BountyCapUSD.Int64())
 	b.BountyPercentage = int(bounty.BountyPercentage.Int64())
 	b.DiligenceRequirements = bounty.DiligenceRequirements
 	b.Identity = Identities[bounty.Identity]
