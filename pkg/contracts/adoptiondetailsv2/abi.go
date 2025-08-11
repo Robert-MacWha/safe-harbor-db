@@ -3,6 +3,7 @@
 package adoptiondetailsv2
 
 import (
+	_ "embed"
 	"errors"
 	"math/big"
 	"strings"
@@ -62,9 +63,12 @@ type AgreementDetailsV2 struct {
 	AgreementURI   string
 }
 
+//go:embed abi.json
+var adoptionDetailsV2ABI string
+
 // AdoptiondetailsV2MetaData contains the minimal ABI (getDetails) for v2.
 var AdoptiondetailsV2MetaData = &bind.MetaData{
-	ABI: "[{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"getDetails\",\"outputs\":[{\"components\":[{\"internalType\":\"string\",\"name\":\"protocolName\",\"type\":\"string\"},{\"components\":[{\"internalType\":\"string\",\"name\":\"name\",\"type\":\"string\"},{\"internalType\":\"string\",\"name\":\"contact\",\"type\":\"string\"}],\"internalType\":\"struct Contact[]\",\"name\":\"contactDetails\",\"type\":\"tuple[]\"},{\"components\":[{\"internalType\":\"string\",\"name\":\"assetRecoveryAddress\",\"type\":\"string\"},{\"components\":[{\"internalType\":\"string\",\"name\":\"accountAddress\",\"type\":\"string\"},{\"internalType\":\"enum ChildContractScope\",\"name\":\"childContractScope\",\"type\":\"uint8\"}],\"internalType\":\"struct Account[]\",\"name\":\"accounts\",\"type\":\"tuple[]\"},{\"internalType\":\"string\",\"name\":\"caip2ChainId\",\"type\":\"string\"}],\"internalType\":\"struct Chain[]\",\"name\":\"chains\",\"type\":\"tuple[]\"},{\"components\":[{\"internalType\":\"uint256\",\"name\":\"bountyPercentage\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"bountyCapUSD\",\"type\":\"uint256\"},{\"internalType\":\"bool\",\"name\":\"retainable\",\"type\":\"bool\"},{\"internalType\":\"enum IdentityRequirements\",\"name\":\"identity\",\"type\":\"uint8\"},{\"internalType\":\"string\",\"name\":\"diligenceRequirements\",\"type\":\"string\"},{\"internalType\":\"uint256\",\"name\":\"aggregateBountyCapUSD\",\"type\":\"uint256\"}],\"internalType\":\"struct BountyTerms\",\"name\":\"bountyTerms\",\"type\":\"tuple\"},{\"internalType\":\"string\",\"name\":\"agreementURI\",\"type\":\"string\"}],\"internalType\":\"struct AgreementDetailsV2\",\"name\":\"\",\"type\":\"tuple\"}]}",
+	ABI: adoptionDetailsV2ABI,
 }
 
 // AdoptiondetailsV2ABI is the input ABI used to generate the binding from.
