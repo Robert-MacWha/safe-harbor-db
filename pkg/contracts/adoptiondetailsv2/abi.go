@@ -96,11 +96,12 @@ func NewAdoptiondetails(address common.Address, backend bind.ContractBackend) (*
 
 // bindAdoptiondetails binds a generic wrapper to an already deployed contract.
 func bindAdoptiondetails(address common.Address, caller bind.ContractCaller) (*bind.BoundContract, error) {
-	parsed, err := AdoptiondetailsV2MetaData.GetAbi()
-	if err != nil {
-		return nil, err
-	}
-	return bind.NewBoundContract(address, *parsed, caller, nil, nil), nil
+    // Parse ABI directly from embedded JSON to avoid any MetaData parsing issues
+    parsed, err := abi.JSON(strings.NewReader(adoptionDetailsV2ABI))
+    if err != nil {
+        return nil, err
+    }
+    return bind.NewBoundContract(address, parsed, caller, nil, nil), nil
 }
 
 // GetDetails is a free data retrieval call binding the contract method getDetails.
