@@ -36,3 +36,14 @@ type SafeHarborAgreementImmunefiV1 struct {
 	SafeHarborAgreementBase
 	AgreementDetails ImmunefiDetailsV1 `firestore:"agreementDetails"`
 }
+
+type SafeHarborAgreementV2 struct {
+	SafeHarborAgreementBase
+	AgreementAddress    string             `firestore:"agreementAddress"`
+	AgreementDetails    AgreementDetailsV2 `firestore:"agreementDetails"`
+	CreatedAt           time.Time          `firestore:"createdAt"`
+	CreatedBlock        int                `firestore:"createdBlock"`
+	Creator             string             `firestore:"creator"`
+	RegistryChainID     int                `firestore:"registryChainId"`
+	RegistryTransaction string             `firestore:"registryTransaction"`
+}

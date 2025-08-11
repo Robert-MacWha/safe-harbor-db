@@ -2,6 +2,7 @@ package main
 
 import (
 	"SHDB/pkg/config"
+	adoptv2 "SHDB/pkg/contracts/adoptiondetailsv2"
 	"SHDB/pkg/contracts/safeharbor"
 	"SHDB/pkg/deduab"
 	"SHDB/pkg/defiliama"
@@ -44,6 +45,42 @@ func main() {
 				Name:   "add-adoption",
 				Usage:  "Add an adoption to the database",
 				Action: runAddAdoption,
+				Flags: []cli.Flag{
+					&cli.StringFlag{
+						Name:     "slug",
+						Usage:    "Defiliama slug of the adopting protocol",
+						Required: true,
+					},
+					&cli.Int64Flag{
+						Name:     "chain",
+						Usage:    "Chain ID of the adoption transaction",
+						Required: true,
+					},
+					&cli.StringFlag{
+						Name:     "txhash",
+						Usage:    "Transaction hash of the safe harbor adoption",
+						Required: true,
+					},
+					&cli.StringFlag{
+						Name:  "adoptionProposalUri",
+						Usage: "URI of the adoption proposal",
+					},
+					&cli.BoolFlag{
+						Name:  "force",
+						Usage: "Force the command to run even if the protocol already exists in the database",
+						Value: false,
+					},
+					&cli.BoolFlag{
+						Name:  "prod",
+						Usage: "Run in production mode. If false, writes to a test collection",
+						Value: false,
+					},
+				},
+			},
+			{
+				Name:   "add-adoption-v2",
+				Usage:  "Add a v2 adoption to the database",
+				Action: runAddAdoptionV2,
 				Flags: []cli.Flag{
 					&cli.StringFlag{
 						Name:     "slug",
@@ -208,6 +245,36 @@ func runAddAdoption(cCtx *cli.Context) error {
 	err = addAdoption(eClient, fClient, protocolCol, agreementCol, slug, chain, txhash, adoptionProposalUri, force)
 	if err != nil {
 		return fmt.Errorf("addAdoption: %w", err)
+	}
+
+	return nil
+}
+
+func runAddAdoptionV2(cCtx *cli.Context) error {
+	_ = godotenv.Load()
+
+	slug := cCtx.String("slug")
+	chain := cCtx.Int("chain")
+	txHashStr := cCtx.String("txhash")
+	force := cCtx.Bool("force")
+	adoptionProposalUri := cCtx.String("adoptionProposalUri")
+	txhash := common.HexToHash(txHashStr)
+
+	protocolCol, agreementCol := getCollectionNames(cCtx)
+
+	fClient, err := firebase.NewFirestoreClient()
+	if err != nil {
+		return fmt.Errorf("NewFirestoreClient: %w", err)
+	}
+
+	eClient, err := getChainClient(chain)
+	if err != nil {
+		return err
+	}
+
+	err = addAdoptionV2(eClient, fClient, protocolCol, agreementCol, slug, chain, txhash, adoptionProposalUri, force)
+	if err != nil {
+		return fmt.Errorf("addAdoptionV2: %w", err)
 	}
 
 	return nil
@@ -500,6 +567,102 @@ func addAdoption(
 		slog.Error("Failed to send Telegram notification", "error", err)
 	}
 
+	return nil
+}
+
+func addAdoptionV2(
+	eClient *ethclient.Client,
+	fClient *firestore.Client,
+	protocolCol string,
+	agreementCol string,
+	slug string,
+	chain int,
+	txhash common.Hash,
+	adoptionProposalUri string,
+	force bool,
+) error {
+	protocol, err := defiliama.GetProtocol(slug)
+	if err != nil {
+		slog.Error("defiliama.GetProtocol", "slug", slug, "error", err)
+		slog.Info("Falling back to no Defiliama protocol data")
+
+		protocol = types.Protocol{Slug: slug, Name: slug}
+	}
+
+	txbody, _, err := eClient.TransactionByHash(context.Background(), txhash)
+	if err != nil {
+		return fmt.Errorf("rpc.TransactionByHash: %w", err)
+	}
+	receipt, err := eClient.TransactionReceipt(context.Background(), txhash)
+	if err != nil {
+		return fmt.Errorf("rpc.TransactionReceipt: %w", err)
+	}
+	sender, err := eClient.TransactionSender(context.Background(), txbody, receipt.BlockHash, receipt.TransactionIndex)
+	if err != nil {
+		return fmt.Errorf("types.Sender: %w", err)
+	}
+
+	agreementAddress, err := safeharbor.GetAgreementAddress(txhash, eClient)
+	if err != nil {
+		return fmt.Errorf("GetAgreementAddress: %w", err)
+	}
+
+	v2Contract, err := adoptv2.NewAdoptiondetails(*agreementAddress, eClient)
+	if err != nil {
+		return fmt.Errorf("adoptiondetailsv2.NewAdoptiondetails: %w", err)
+	}
+	rawDetails, err := v2Contract.GetDetails(nil)
+	if err != nil {
+		return fmt.Errorf("adoptiondetailsv2.GetDetails: %w", err)
+	}
+
+	details := types.AgreementDetailsV2{}
+	details.FromRawAgreementDetails(rawDetails)
+
+	// Best-effort naming for EVM chains using CAIP-2 eip155:<id>
+	details.TryNameAddressesByCAIP2(func(chainID int) (scan.Client, error) {
+		return getScanClient(chainID)
+	})
+
+	protocolDocRef, err := uploadProtocol(fClient, protocol, protocolCol, force)
+	if err != nil {
+		return fmt.Errorf("uploadProtocol: %w", err)
+	}
+
+	fAdoption := types.SafeHarborAgreementV2{
+		SafeHarborAgreementBase: types.SafeHarborAgreementBase{
+			AdoptionProposalURI: adoptionProposalUri,
+			Protocol:            protocolDocRef,
+			Slug:                "onchain-" + txhash.String(),
+			Version:             types.SealV2,
+		},
+		AgreementDetails:    details,
+		AgreementAddress:    agreementAddress.String(),
+		CreatedAt:           txbody.Time(),
+		Creator:             sender.String(),
+		RegistryTransaction: txhash.String(),
+		RegistryChainID:     chain,
+	}
+
+	slog.Info("Uploading V2 adoption", "adoption", txhash.String())
+	agreementDocRef := fClient.Collection(agreementCol).Doc(txhash.String())
+	if _, err := agreementDocRef.Set(context.Background(), fAdoption); err != nil {
+		return fmt.Errorf("firestore.Set: %w", err)
+	}
+
+	slog.Info("Updating protocol with safe harbor agreement reference")
+	protocol.SafeHarborAgreement = agreementDocRef
+	if _, err := protocolDocRef.Set(context.Background(), protocol); err != nil {
+		return fmt.Errorf("firestore.Set: %w", err)
+	}
+
+	slog.Info("Successfully added V2 adoption to database")
+	telegramMessage := "🚨 New Safe Harbor Adoption (V2)\n\n"
+	telegramMessage += fmt.Sprintf("Protocol: %s\n", slug)
+	telegramMessage += fmt.Sprintf("URL: https://safe-harbor-d9e89.web.app/database/%s\n", slug)
+	if err := telegram.SendNotification(telegramMessage, os.Getenv("TELEGRAM_BOT_TOKEN"), os.Getenv("TELEGRAM_CHAT_ID")); err != nil {
+		slog.Error("Failed to send Telegram notification", "error", err)
+	}
 	return nil
 }
 

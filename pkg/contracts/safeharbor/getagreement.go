@@ -56,3 +56,36 @@ func GetAgreement(
 
 	return nil, nil, fmt.Errorf("no safe harbor adoption logs found in transaction receipt")
 }
+
+// GetAgreementAddress parses the SafeHarborAdoption event in the tx receipt and returns the new details contract address.
+func GetAgreementAddress(
+	txhash common.Hash,
+	eClient *ethclient.Client,
+) (*common.Address, error) {
+	contract, err := NewSafeharborFilterer(common.HexToAddress("0x0"), eClient)
+	if err != nil {
+		return nil, fmt.Errorf("contracts.NewContracts: %w", err)
+	}
+
+	receipt, err := eClient.TransactionReceipt(context.Background(), txhash)
+	if err != nil {
+		return nil, fmt.Errorf("rpc.TransactionReceipt: %w", err)
+	}
+
+	for _, log := range receipt.Logs {
+		if log == nil {
+			slog.Warn("nil log in receipt")
+			continue
+		}
+
+		adoption, err := contract.ParseSafeHarborAdoption(*log)
+		if err != nil || adoption == nil {
+			continue
+		}
+
+		addr := adoption.NewDetails
+		return &addr, nil
+	}
+
+	return nil, fmt.Errorf("no safe harbor adoption logs found in transaction receipt")
+}
