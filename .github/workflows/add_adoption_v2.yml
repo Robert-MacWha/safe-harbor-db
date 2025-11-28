@@ -13,6 +13,8 @@ on:
                 required: true
             proposalUri:
                 description: "Adoption proposal uri"
+            bugBounty:
+                description: "Bug Bounty uri"
             force:
                 description: "Force adoption addition"
                 type: boolean
@@ -54,5 +56,5 @@ jobs:
 
             - name: Run the program
               run: |
-                  ./main add-adoption-v2 --slug=${{ github.event.inputs.slug }} --chain=${{ github.event.inputs.chain }} --txhash=${{ github.event.inputs.txhash }} --adoptionProposalUri="${{ github.event.inputs.proposalUri || '' }}" --force=${{ github.event.inputs.force }} --prod=true
+                  ./main add-adoption-v2 --slug=${{ github.event.inputs.slug }} --chain=${{ github.event.inputs.chain }} --txhash=${{ github.event.inputs.txhash }} --adoptionProposalUri="${{ github.event.inputs.proposalUri || '' }}" --bugBounty="${{ github.event.inputs.bugBounty || '' }}" --force=${{ github.event.inputs.force }} --prod=true
 

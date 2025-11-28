@@ -83,6 +83,7 @@ func GetProtocol(slug string) (types.Protocol, error) {
 		Icon:     details.Logo,
 		TVL:      getLastTVL(details.TVL),
 		Category: getProtocolCategory(details.Twitter),
+		BugBounty: "",
 	}, nil
 }
 

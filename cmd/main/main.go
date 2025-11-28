@@ -65,6 +65,10 @@ func main() {
 						Name:  "adoptionProposalUri",
 						Usage: "URI of the adoption proposal",
 					},
+					&cli.StringFlag{
+						Name:  "bugBounty",
+						Usage: "Protocol's bug bounty program URL",
+					},
 					&cli.BoolFlag{
 						Name:  "force",
 						Usage: "Force the command to run even if the protocol already exists in the database",
@@ -100,6 +104,10 @@ func main() {
 					&cli.StringFlag{
 						Name:  "adoptionProposalUri",
 						Usage: "URI of the adoption proposal",
+					},
+					&cli.StringFlag{
+						Name:  "bugBounty",
+						Usage: "Protocol's bug bounty program URL",
 					},
 					&cli.BoolFlag{
 						Name:  "force",
@@ -228,6 +236,7 @@ func runAddAdoption(cCtx *cli.Context) error {
 	txHashStr := cCtx.String("txhash")
 	force := cCtx.Bool("force")
 	adoptionProposalUri := cCtx.String("adoptionProposalUri")
+	bugBounty := cCtx.String("bugBounty")
 	txhash := common.HexToHash(txHashStr)
 
 	protocolCol, agreementCol := getCollectionNames(cCtx)
@@ -242,7 +251,7 @@ func runAddAdoption(cCtx *cli.Context) error {
 		return err
 	}
 
-	err = addAdoption(eClient, fClient, protocolCol, agreementCol, slug, chain, txhash, adoptionProposalUri, force)
+	err = addAdoption(eClient, fClient, protocolCol, agreementCol, slug, chain, txhash, adoptionProposalUri, bugBounty, force)
 	if err != nil {
 		return fmt.Errorf("addAdoption: %w", err)
 	}
@@ -258,6 +267,7 @@ func runAddAdoptionV2(cCtx *cli.Context) error {
 	txHashStr := cCtx.String("txhash")
 	force := cCtx.Bool("force")
 	adoptionProposalUri := cCtx.String("adoptionProposalUri")
+	bugBounty := cCtx.String("bugBounty")
 	txhash := common.HexToHash(txHashStr)
 
 	protocolCol, agreementCol := getCollectionNames(cCtx)
@@ -272,7 +282,7 @@ func runAddAdoptionV2(cCtx *cli.Context) error {
 		return err
 	}
 
-	err = addAdoptionV2(eClient, fClient, protocolCol, agreementCol, slug, chain, txhash, adoptionProposalUri, force)
+	err = addAdoptionV2(eClient, fClient, protocolCol, agreementCol, slug, chain, txhash, adoptionProposalUri, bugBounty, force)
 	if err != nil {
 		return fmt.Errorf("addAdoptionV2: %w", err)
 	}
@@ -470,6 +480,7 @@ func addAdoption(
 	chain int,
 	txhash common.Hash,
 	adoptionProposalUri string,
+	bugBounty string,
 	force bool,
 ) error {
 	protocol, err := defiliama.GetProtocol(slug)
@@ -478,10 +489,12 @@ func addAdoption(
 		slog.Info("Falling back to no Defiliama protocol data")
 
 		protocol = types.Protocol{
-			Slug: slug,
-			Name: slug,
+			Slug:      slug,
+			Name:      slug,
+			BugBounty: bugBounty,
 		}
 	}
+	protocol.BugBounty = bugBounty
 
 	// Fetch safe harbor adoption from blockchain
 	txbody, _, err := eClient.TransactionByHash(context.Background(), txhash)
@@ -579,6 +592,7 @@ func addAdoptionV2(
 	chain int,
 	txhash common.Hash,
 	adoptionProposalUri string,
+	bugBounty string,
 	force bool,
 ) error {
 	protocol, err := defiliama.GetProtocol(slug)
@@ -586,8 +600,9 @@ func addAdoptionV2(
 		slog.Error("defiliama.GetProtocol", "slug", slug, "error", err)
 		slog.Info("Falling back to no Defiliama protocol data")
 
-		protocol = types.Protocol{Slug: slug, Name: slug}
+		protocol = types.Protocol{Slug: slug, Name: slug, BugBounty: bugBounty}
 	}
+	protocol.BugBounty = bugBounty
 
 	txbody, _, err := eClient.TransactionByHash(context.Background(), txhash)
 	if err != nil {

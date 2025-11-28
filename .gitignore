@@ -36,3 +36,4 @@ testing/*
 compose.yaml
 
 *__pycache__/
+.envrc

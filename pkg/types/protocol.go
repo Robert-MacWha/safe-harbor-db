@@ -11,5 +11,6 @@ type Protocol struct {
 	TVL                 float64                `firestore:"tvl"`
 	Category            string                 `firestore:"category"`
 	ContactDetails      string                 `firestore:"contactDetails"`
+	BugBounty           string                 `firestore:"bugBounty,omitempty"`
 	SafeHarborAgreement *firestore.DocumentRef `firestore:"safeHarborAgreement,omitempty"`
 }
