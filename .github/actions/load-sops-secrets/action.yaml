@@ -17,6 +17,9 @@ runs:
       env:
         SOPS_AGE_KEY: ${{ inputs.age_key }}
       run: |
-        sops -d --output-type dotenv secrets/secrets.yaml >> $GITHUB_ENV
+        sops -d --output-type dotenv secrets/secrets.yaml | grep -v '^#' | grep -v '^$' | while IFS='=' read -r key value; do
+          echo "::add-mask::$value"
+          echo "$key=$value" >> $GITHUB_ENV
+        done
         sops -d secrets/firebase.json > secrets/.firebase.json
         echo "GOOGLE_APPLICATION_CREDENTIALS=secrets/.firebase.json" >> $GITHUB_ENV
