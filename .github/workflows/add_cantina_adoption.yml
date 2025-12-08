@@ -1,0 +1,42 @@
+name: add_cantina_adoption
+on:
+    workflow_dispatch:
+        inputs:
+            cantina-id:
+                description: "Cantina project ID"
+                required: true
+            defiliama-slug:
+                description: "Project defiliama slug"
+                required: true
+            force:
+                description: "Force adoption addition"
+                type: boolean
+
+jobs:
+    update_tvl:
+        runs-on: ubuntu-latest
+        name: "Add Cantina Adoption: ${{ github.event.inputs.cantina-id }}"
+
+        steps:
+            - uses: actions/checkout@v4
+
+            - uses: ./.github/actions/load-sops-secrets
+              with:
+                age_key: ${{ secrets.SOPS_AGE_KEY }}
+
+            - uses: actions/setup-go@v5
+              with:
+                  go-version: 1.22.3
+                  cache: true
+
+            - run: go mod download
+
+            - run: go build -o main cmd/main/main.go
+
+            - name: Run the program
+              run: |
+                  ./main add-cantina-adoption \
+                    --cantina-id=${{ github.event.inputs.cantina-id }} \
+                    --defiliama-slug=${{ github.event.inputs.defiliama-slug }} \
+                    --force=${{ github.event.inputs.force }} \
+                    --prod=true

@@ -779,6 +779,7 @@ func addImmunefiAdoption(
 	if err != nil {
 		return fmt.Errorf("uploadProtocol: %w", err)
 	}
+	agreement.Protocol = protocolDocRef
 
 	// Upload safe harbor adoption
 	slug := "immunefi-" + immunefiSlug
@@ -841,6 +842,7 @@ func addCantinaAdoption(
 	if err != nil {
 		return fmt.Errorf("uploadProtocol: %w", err)
 	}
+	agreement.Protocol = protocolDocRef
 
 	// Upload safe harbor adoption
 	slug := "cantina-" + cantinaID

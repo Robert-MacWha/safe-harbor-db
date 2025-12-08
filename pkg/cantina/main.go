@@ -77,7 +77,7 @@ func (c *Client) GetAgreement(id string) (types.SafeHarborAgreementCantinaV1, er
 	}
 
 	for _, agreement := range agreements {
-		if agreement.Slug == id {
+		if agreement.Slug == "cantina-"+id {
 			return agreement, nil
 		}
 	}
@@ -107,7 +107,7 @@ func (b bounty) toSafeHarborAgreement() types.SafeHarborAgreementCantinaV1 {
 	safeHarborAgreement := types.SafeHarborAgreementCantinaV1{
 		SafeHarborAgreementBase: types.SafeHarborAgreementBase{
 			AdoptionProposalURI: "",
-			Slug:                "cantina-" + b.Name,
+			Slug:                "cantina-" + b.Id,
 			Version:             types.CantinaV1,
 		},
 		AgreementDetails: types.CantinaDetailsV1{
