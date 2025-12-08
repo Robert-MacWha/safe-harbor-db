@@ -1,6 +1,5 @@
-keys:
-  - &robert age1wrc3nndwc8vqg5fy4ks9xcldfnzd3wgkd9z6ak5edxa93cs4g4ysjxt0w5
-
 creation_rules:
   - path: secrets/secrets.yaml
-    age: *robert
+    age: >-
+      age1wrc3nndwc8vqg5fy4ks9xcldfnzd3wgkd9z6ak5edxa93cs4g4ysjxt0w5,
+      age1cjz9phfya80xpstvmm6hegsks4lpcllnl8w3j5ntv408c8fkd45qdx6zzm
