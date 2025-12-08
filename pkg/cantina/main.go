@@ -120,6 +120,7 @@ func (b bounty) toSafeHarborAgreement() types.SafeHarborAgreementCantinaV1 {
 			},
 			RecoveryAddresses: recoveryAddresses,
 			Assets:            assets,
+			CantinaUrl:        fmt.Sprintf("https://cantina.xyz/bounties/%s", b.Id),
 		},
 	}
 

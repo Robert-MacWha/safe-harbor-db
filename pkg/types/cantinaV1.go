@@ -6,6 +6,7 @@ type CantinaDetailsV1 struct {
 	RecoveryAddresses []CantinaRecoveryAddressV1 `firestore:"recoveryAddresses"`
 	Assets            []CantinaAssetsV1          `firestore:"assets"`
 	BountyTerms       BountyTermsV1              `firestore:"bountyTerms"`
+	CantinaUrl        string                     `firestore:"cantinaUrl"`
 }
 
 type CantinaRecoveryAddressV1 struct {
