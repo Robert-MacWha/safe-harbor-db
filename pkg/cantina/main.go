@@ -64,13 +64,6 @@ func (c *Client) GetAgreements() ([]types.SafeHarborAgreementCantinaV1, error) {
 			continue
 		}
 
-		// Cantina uses the on-chain registry for some bounties, and their own
-		// internal system for others.  Here we only want those that use Cantina's
-		// internal system, so we skip those without a SafeHarbor.Id
-		if b.SafeHarbor.Id == "" {
-			continue
-		}
-
 		agreements = append(agreements, b.toSafeHarborAgreement())
 	}
 
@@ -114,7 +107,7 @@ func (b bounty) toSafeHarborAgreement() types.SafeHarborAgreementCantinaV1 {
 	safeHarborAgreement := types.SafeHarborAgreementCantinaV1{
 		SafeHarborAgreementBase: types.SafeHarborAgreementBase{
 			AdoptionProposalURI: "",
-			Slug:                "cantina-" + b.Id,
+			Slug:                "cantina-" + b.Name,
 			Version:             types.CantinaV1,
 		},
 		AgreementDetails: types.CantinaDetailsV1{

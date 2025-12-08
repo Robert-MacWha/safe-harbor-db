@@ -505,7 +505,7 @@ func runCheckNewAdoptions(cCtx *cli.Context) error {
 		return err
 	}
 
-	newOnchainAdoptions, err := checkNewOnchainAdoptions(fClient, agreementCol)
+	newOnchainAdoptions, err := checkNewOnchainAdoptions(fClient, agreementCol, false)
 	if err != nil {
 		return fmt.Errorf("checkNewOnchainAdoptions: %w", err)
 	}
@@ -1058,7 +1058,7 @@ func checkNewCantinaAdoptions(cClient *cantina.Client, fClient *firestore.Client
 	return newAdoptions, nil
 }
 
-func checkNewOnchainAdoptions(fClient *firestore.Client, agreementCol string) ([]string, error) {
+func checkNewOnchainAdoptions(fClient *firestore.Client, agreementCol string, full bool) ([]string, error) {
 	existingAdoptions := make(map[string]bool)
 	agreementDocs, err := fClient.Collection(agreementCol).Documents(context.Background()).GetAll()
 	if err != nil {
@@ -1072,7 +1072,8 @@ func checkNewOnchainAdoptions(fClient *firestore.Client, agreementCol string) ([
 	// Fetch adoptions from all chains
 	var allNewAdoptions = make(map[string]bool)
 	for chainID := range config.SafeHarborV1Registries {
-		adoptions, err := checkChainForAdoptions(chainID)
+		slog.Info("Checking chain for new adoptions...", "chainID", chainID)
+		adoptions, err := checkChainForAdoptions(chainID, full)
 		if err != nil {
 			slog.Warn("checkChainForAdoptions", "chainID", chainID, "error", err)
 			continue
@@ -1086,6 +1087,7 @@ func checkNewOnchainAdoptions(fClient *firestore.Client, agreementCol string) ([
 			chained_txhash := fmt.Sprintf("chain={%d} txhash={%s}", chainID, txHash)
 			allNewAdoptions[chained_txhash] = true
 		}
+		slog.Info("Checked chain for new adoptions", "chainID", chainID, "found", len(adoptions))
 	}
 
 	var newAdoptions []string
@@ -1096,7 +1098,7 @@ func checkNewOnchainAdoptions(fClient *firestore.Client, agreementCol string) ([
 	return newAdoptions, nil
 }
 
-func checkChainForAdoptions(chainId int) ([]string, error) {
+func checkChainForAdoptions(chainId int, full bool) ([]string, error) {
 	eClient, err := getChainClient(chainId)
 	if err != nil {
 		return nil, fmt.Errorf("getChainClient: %w", err)
@@ -1114,27 +1116,37 @@ func checkChainForAdoptions(chainId int) ([]string, error) {
 		return nil, fmt.Errorf("BlockByNumber: %w", err)
 	}
 
-	fromBlock := latestBlock - 10_000
-	opts := &bind.FilterOpts{
-		Start: fromBlock,
-	}
-
-	// Get all adoption events
-	iter, err := filter.FilterSafeHarborAdoption(opts, nil)
-	if err != nil {
-		return nil, fmt.Errorf("FilterSafeHarborAdoption: %w", err)
-	}
-	defer iter.Close()
-
 	var adoptions []string
-	for iter.Next() {
-		event := iter.Event
-		txHash := event.Raw.TxHash.Hex()
-		adoptions = append(adoptions, txHash)
-	}
 
-	if iter.Error() != nil {
-		return nil, fmt.Errorf("event iteration error: %w", iter.Error())
+	//? 100k blocks should be enough to cover new adoptions since last check on all chains
+	fromBlock := latestBlock - 100_000
+	// Scan in 1000 block increments
+	for start := fromBlock; start < latestBlock; start += 1000 {
+		end := start + 1000
+		end = min(end, latestBlock)
+
+		// slog.Debug("Scanning blocks for adoptions...", "chainID", chainId, "start", start, "end", end)
+		opts := &bind.FilterOpts{
+			Start: start,
+			End:   &end,
+		}
+
+		// Get all adoption events
+		iter, err := filter.FilterSafeHarborAdoption(opts, nil)
+		if err != nil {
+			return nil, fmt.Errorf("FilterSafeHarborAdoption: %w", err)
+		}
+		defer iter.Close()
+
+		for iter.Next() {
+			event := iter.Event
+			txHash := event.Raw.TxHash.Hex()
+			adoptions = append(adoptions, txHash)
+		}
+
+		if iter.Error() != nil {
+			return nil, fmt.Errorf("event iteration error: %w", iter.Error())
+		}
 	}
 
 	return adoptions, nil
