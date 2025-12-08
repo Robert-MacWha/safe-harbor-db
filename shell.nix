@@ -6,5 +6,6 @@ pkgs.mkShell {
     go
     gopls
     delve
+    sops
   ];
 }

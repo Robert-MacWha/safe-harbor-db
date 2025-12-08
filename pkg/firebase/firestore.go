@@ -3,8 +3,6 @@ package firebase
 import (
 	"context"
 	"fmt"
-	"os"
-	"strings"
 
 	"cloud.google.com/go/firestore"
 	firebase "firebase.google.com/go"
@@ -12,14 +10,8 @@ import (
 )
 
 func NewFirestoreClient() (*firestore.Client, error) {
-	creds := os.Getenv("FIREBASE_CREDENTIALS")
-	if creds == "" {
-		return nil, fmt.Errorf("missing FIREBASE_CREDENTIALS env")
-	}
-
 	ctx := context.Background()
-	creds = strings.Trim(creds, "'")
-	sa := option.WithCredentialsJSON([]byte(creds))
+	sa := option.WithCredentialsFile("./secrets/.firebase.json")
 	app, err := firebase.NewApp(ctx, nil, sa)
 	if err != nil {
 		return nil, fmt.Errorf("firebase.NewApp: %w", err)

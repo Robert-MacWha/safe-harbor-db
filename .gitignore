@@ -29,7 +29,6 @@ testing/*
 *.solc/*
 
 *.bin
-.env
 *.solc/*
 *.log
 
@@ -37,3 +36,5 @@ compose.yaml
 
 *__pycache__/
 .envrc
+.direnv
+secrets/.*
