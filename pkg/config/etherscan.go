@@ -41,7 +41,7 @@ func LoadChainCfg() (map[int]ChainCfg, error) {
 	for chain, scanUrl := range ScanUrls {
 		//? Stored as environment secrets
 		rpcUrlEnv := fmt.Sprintf("RPC_URL_%d", chain)
-		scanKeyEnv := fmt.Sprintf("SCAN_KEY_%d", chain)
+		scanKeyEnv := "SCAN_KEY"
 
 		rpcUrl := os.Getenv(rpcUrlEnv)
 		if rpcUrl == "" {
