@@ -1,6 +1,7 @@
 package main
 
 import (
+	"SHDB/pkg/cantina"
 	"SHDB/pkg/config"
 	adoptv2 "SHDB/pkg/contracts/adoptiondetailsv2"
 	"SHDB/pkg/contracts/safeharbor"
@@ -129,6 +130,33 @@ func main() {
 					&cli.StringFlag{
 						Name:     "immunefi-slug",
 						Usage:    "Immunefi slug of the adopting protocol",
+						Required: true,
+					},
+					&cli.StringFlag{
+						Name:     "defiliama-slug",
+						Usage:    "Defiliama slug of the adopting protocol",
+						Required: true,
+					},
+					&cli.BoolFlag{
+						Name:  "force",
+						Usage: "Force the command to run even if the protocol already exists in the database",
+						Value: false,
+					},
+					&cli.BoolFlag{
+						Name:  "prod",
+						Usage: "Run in production mode. If false, writes to a test collection",
+						Value: false,
+					},
+				},
+			},
+			{
+				Name:   "add-cantina-adoption",
+				Usage:  "Adds an adoption from Cantina to the database",
+				Action: runAddCantinaAdoption,
+				Flags: []cli.Flag{
+					&cli.StringFlag{
+						Name:     "cantina-id",
+						Usage:    "Cantina ID of the adopting protocol",
 						Required: true,
 					},
 					&cli.StringFlag{
@@ -318,6 +346,34 @@ func runAddImmunefiAdoption(cCtx *cli.Context) error {
 	return nil
 }
 
+func runAddCantinaAdoption(cCtx *cli.Context) error {
+	_ = godotenv.Load()
+
+	//* Load config
+	cantinaID := cCtx.String("cantina-id")
+	defiliamaSlug := cCtx.String("defiliama-slug")
+	force := cCtx.Bool("force")
+
+	protocolCol, agreementCol := getCollectionNames(cCtx)
+
+	fClient, err := firebase.NewFirestoreClient()
+	if err != nil {
+		return fmt.Errorf("NewFirestoreClient: %w", err)
+	}
+
+	cClient, err := cantina.NewClient()
+	if err != nil {
+		return fmt.Errorf("NewClient: %w", err)
+	}
+
+	err = addCantinaAdoption(cClient, fClient, protocolCol, agreementCol, cantinaID, defiliamaSlug, force)
+	if err != nil {
+		return fmt.Errorf("addCantinaAdoption: %w", err)
+	}
+
+	return nil
+}
+
 func runRefreshTvl(cCtx *cli.Context) error {
 	_ = godotenv.Load()
 
@@ -433,8 +489,18 @@ func runCheckNewAdoptions(cCtx *cli.Context) error {
 		return fmt.Errorf("NewClient: %w", err)
 	}
 
+	cClient, err := cantina.NewClient()
+	if err != nil {
+		return fmt.Errorf("NewClient: %w", err)
+	}
+
 	//* Get new adoptions
 	newImmunefiAdoptions, err := checkNewImmunefiAdoptions(iClient, fClient, agreementCol)
+	if err != nil {
+		return err
+	}
+
+	newCantinaAdoptions, err := checkNewCantinaAdoptions(cClient, fClient, agreementCol)
 	if err != nil {
 		return err
 	}
@@ -446,6 +512,7 @@ func runCheckNewAdoptions(cCtx *cli.Context) error {
 
 	newAdoptions := make([]string, 0, len(newImmunefiAdoptions)+len(newOnchainAdoptions))
 	newAdoptions = append(newAdoptions, newImmunefiAdoptions...)
+	newAdoptions = append(newAdoptions, newCantinaAdoptions...)
 	newAdoptions = append(newAdoptions, newOnchainAdoptions...)
 
 	if len(newAdoptions) == 0 {
@@ -458,7 +525,7 @@ func runCheckNewAdoptions(cCtx *cli.Context) error {
 	for _, slug := range newAdoptions {
 		message += fmt.Sprintf("- `%s`\n", slug)
 	}
-	message += "\nRun the `add-immunefi-adoption` github action to add them to the database."
+	message += "\nRun the `add-*-adoption` github action to add them to the database."
 
 	slog.Info("New adoptions found", "count", len(newAdoptions), "message", message)
 	if !dryRun {
@@ -743,6 +810,68 @@ func addImmunefiAdoption(
 	return nil
 }
 
+func addCantinaAdoption(
+	cClient *cantina.Client,
+	fClient *firestore.Client,
+	protocolCol string,
+	agreementCol string,
+	cantinaID string,
+	defiliamaSlug string,
+	force bool,
+) error {
+	protocol, err := defiliama.GetProtocol(defiliamaSlug)
+	if err != nil {
+		slog.Error("defiliama.GetProtocol", "slug", defiliamaSlug, "error", err)
+		slog.Info("Falling back to no Defiliama protocol data")
+
+		protocol = types.Protocol{
+			Slug: defiliamaSlug,
+			Name: defiliamaSlug,
+		}
+	}
+
+	// Fetch safe harbor agreement from Cantina
+	agreement, err := cClient.GetAgreement(cantinaID)
+	if err != nil {
+		return fmt.Errorf("GetAgreement: %w", err)
+	}
+
+	//* Upload protocol & adoption to firestore if not already present
+	protocolDocRef, err := uploadProtocol(fClient, protocol, protocolCol, force)
+	if err != nil {
+		return fmt.Errorf("uploadProtocol: %w", err)
+	}
+
+	// Upload safe harbor adoption
+	slug := "cantina-" + cantinaID
+	slog.Info("Uploading adoption", "adoption", slug)
+	agreementDocRef := fClient.Collection(agreementCol).Doc(slug)
+	_, err = agreementDocRef.Set(context.Background(), agreement)
+	if err != nil {
+		return fmt.Errorf("firestore.Set: %w", err)
+	}
+
+	// Update protocol with safe harbor agreement reference
+	slog.Info("Updating protocol with safe harbor agreement reference")
+	protocol.SafeHarborAgreement = agreementDocRef
+	_, err = protocolDocRef.Set(context.Background(), protocol)
+	if err != nil {
+		return fmt.Errorf("firestore.Set: %w", err)
+	}
+
+	slog.Info("Successfully added adoption to database")
+	// Send Telegram notification
+	telegramMessage := "🚨 New Cantina Safe Harbor Adoption\n\n"
+	telegramMessage += fmt.Sprintf("Protocol: %s\n", slug)
+	telegramMessage += fmt.Sprintf("URL: https://safe-harbor-d9e89.web.app/%s\n", slug)
+
+	err = telegram.SendNotification(telegramMessage, os.Getenv("TELEGRAM_BOT_TOKEN"), os.Getenv("TELEGRAM_CHAT_ID"))
+	if err != nil {
+		slog.Error("Failed to send Telegram notification", "error", err)
+	}
+	return nil
+}
+
 func refreshTvl(
 	fClient *firestore.Client,
 	protocolCol string,
@@ -882,7 +1011,7 @@ func refreshAdoptionDate(
 func checkNewImmunefiAdoptions(iClient *immunefi.Client, fClient *firestore.Client, agreementCol string) ([]string, error) {
 	agreements, err := iClient.GetAgreements()
 	if err != nil {
-		return nil, fmt.Errorf("GetAgreements: %w", err)
+		return nil, fmt.Errorf("immunefi.GetAgreements: %w", err)
 	}
 
 	agreementsDoc, err := fClient.Collection(agreementCol).Documents(context.Background()).GetAll()
@@ -892,6 +1021,31 @@ func checkNewImmunefiAdoptions(iClient *immunefi.Client, fClient *firestore.Clie
 
 	existingAdoptions := make(map[string]bool)
 	for _, doc := range agreementsDoc {
+		existingAdoptions[doc.Ref.ID] = true
+	}
+
+	var newAdoptions []string
+	for _, agreement := range agreements {
+		if _, exists := existingAdoptions[agreement.Slug]; !exists {
+			newAdoptions = append(newAdoptions, agreement.Slug)
+		}
+	}
+	return newAdoptions, nil
+}
+
+func checkNewCantinaAdoptions(cClient *cantina.Client, fClient *firestore.Client, agreementCol string) ([]string, error) {
+	agreements, err := cClient.GetAgreements()
+	if err != nil {
+		return nil, fmt.Errorf("cantina.GetAgreements: %w", err)
+	}
+
+	agreementDocs, err := fClient.Collection(agreementCol).Documents(context.Background()).GetAll()
+	if err != nil {
+		return nil, fmt.Errorf("firestore.GetAll: %w", err)
+	}
+
+	existingAdoptions := make(map[string]bool)
+	for _, doc := range agreementDocs {
 		existingAdoptions[doc.Ref.ID] = true
 	}
 

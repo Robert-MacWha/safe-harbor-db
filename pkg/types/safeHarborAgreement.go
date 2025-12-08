@@ -12,6 +12,7 @@ const (
 	SealV1     SafeHarborVersion = "seal-1"
 	SealV2     SafeHarborVersion = "seal-2"
 	ImmunefiV1 SafeHarborVersion = "immunefi-1"
+	CantinaV1  SafeHarborVersion = "cantina-1"
 )
 
 type SafeHarborAgreementBase struct {
@@ -35,6 +36,11 @@ type SafeHarborAgreementV1 struct {
 type SafeHarborAgreementImmunefiV1 struct {
 	SafeHarborAgreementBase
 	AgreementDetails ImmunefiDetailsV1 `firestore:"agreementDetails"`
+}
+
+type SafeHarborAgreementCantinaV1 struct {
+	SafeHarborAgreementBase
+	AgreementDetails CantinaDetailsV1 `firestore:"agreementDetails"`
 }
 
 type SafeHarborAgreementV2 struct {
