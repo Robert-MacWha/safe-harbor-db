@@ -35,7 +35,7 @@ type protocolCategory struct {
 }
 
 func GetTvl(slug string) (float64, error) {
-	resp, err := http.Get(fmt.Sprintf("https://api.llama.fi/protocol/%s", slug))
+	resp, err := http.Get(fmt.Sprintf("https://api.llama.fi/tvl/%s", slug))
 	if err != nil {
 		return 0, fmt.Errorf("http.Get: %w", err)
 	}
@@ -45,18 +45,13 @@ func GetTvl(slug string) (float64, error) {
 		return 0, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
 	}
 
-	var details protocolDetail
-	err = json.NewDecoder(resp.Body).Decode(&details)
+	var tvl float64
+	err = json.NewDecoder(resp.Body).Decode(&tvl)
 	if err != nil {
 		return 0, fmt.Errorf("json.Decode: %w", err)
 	}
 
-	lastTvl := getLastTVL(details.TVL)
-	if borrowed, ok := details.ChainTVL["borrowed"]; ok {
-		lastTvl += borrowed
-	}
-
-	return lastTvl, nil
+	return tvl, nil
 }
 
 func GetProtocol(slug string) (types.Protocol, error) {
@@ -76,13 +71,18 @@ func GetProtocol(slug string) (types.Protocol, error) {
 		return types.Protocol{}, fmt.Errorf("json.Decode: %w", err)
 	}
 
+	tvl, err := GetTvl(slug)
+	if err != nil {
+		return types.Protocol{}, err
+	}
+
 	return types.Protocol{
-		Name:     details.Name,
-		Slug:     slug,
-		Website:  details.URL,
-		Icon:     details.Logo,
-		TVL:      getLastTVL(details.TVL),
-		Category: getProtocolCategory(details.Twitter),
+		Name:      details.Name,
+		Slug:      slug,
+		Website:   details.URL,
+		Icon:      details.Logo,
+		TVL:       tvl,
+		Category:  getProtocolCategory(details.Twitter),
 		BugBounty: "",
 	}, nil
 }
@@ -112,11 +112,4 @@ func getProtocolCategory(twitter string) string {
 	}
 
 	return category
-}
-
-func getLastTVL(tvlData []tvl) float64 {
-	if len(tvlData) > 0 {
-		return tvlData[len(tvlData)-1].TotalLiquidityUSD
-	}
-	return 0
 }
