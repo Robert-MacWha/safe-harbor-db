@@ -1,4 +1,4 @@
-package safeharbor
+package safeharbor_v3
 
 import (
 	"SHDB/pkg/contracts/adoptiondetails"
@@ -14,7 +14,7 @@ func GetAgreement(
 	txhash common.Hash,
 	eClient *ethclient.Client,
 ) (agreementAddress *common.Address, agreement *adoptiondetails.AgreementDetailsV1, err error) {
-	contract, err := NewSafeharborFilterer(common.HexToAddress("0x0"), eClient)
+	contract, err := NewSafeHarborV3Filterer(common.HexToAddress("0x0"), eClient)
 	if err != nil {
 		return nil, nil, fmt.Errorf("contracts.NewContracts: %w", err)
 	}
@@ -39,8 +39,8 @@ func GetAgreement(
 			continue
 		}
 
-		agreementAddress = &adoption.NewDetails
-		agreementContract, err := adoptiondetails.NewAdoptiondetails(adoption.NewDetails, eClient)
+		agreementAddress = &adoption.AgreementAddress
+		agreementContract, err := adoptiondetails.NewAdoptiondetails(adoption.AgreementAddress, eClient)
 		if err != nil {
 			return nil, nil, fmt.Errorf("contracts.NewAdoptiondetails: %w", err)
 		}
@@ -62,7 +62,7 @@ func GetAgreementAddress(
 	txhash common.Hash,
 	eClient *ethclient.Client,
 ) (*common.Address, error) {
-	contract, err := NewSafeharborFilterer(common.HexToAddress("0x0"), eClient)
+	contract, err := NewSafeHarborV3Filterer(common.HexToAddress("0x0"), eClient)
 	if err != nil {
 		return nil, fmt.Errorf("contracts.NewContracts: %w", err)
 	}
@@ -84,7 +84,7 @@ func GetAgreementAddress(
 			continue
 		}
 
-		addr := adoption.NewDetails
+		addr := adoption.AgreementAddress
 		return &addr, nil
 	}
 

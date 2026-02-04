@@ -5,10 +5,10 @@ import (
 	"SHDB/pkg/config"
 	adoptv2 "SHDB/pkg/contracts/adoptiondetailsv2"
 	"SHDB/pkg/contracts/safeharbor"
+	"SHDB/pkg/contracts/safeharbor_v3"
 	"SHDB/pkg/deduab"
 	"SHDB/pkg/defiliama"
 	"SHDB/pkg/firebase"
-	"SHDB/pkg/immunefi"
 	"SHDB/pkg/scan"
 	"SHDB/pkg/telegram"
 	"SHDB/pkg/types"
@@ -123,19 +123,32 @@ func main() {
 				},
 			},
 			{
-				Name:   "add-immunefi-adoption",
-				Usage:  "Adds an adoption from Immunefi to the database",
-				Action: runAddImmunefiAdoption,
+				Name:   "add-adoption-v3",
+				Usage:  "Add a v3 adoption to the database",
+				Action: runAddAdoptionV3,
 				Flags: []cli.Flag{
 					&cli.StringFlag{
-						Name:     "immunefi-slug",
-						Usage:    "Immunefi slug of the adopting protocol",
+						Name:     "slug",
+						Usage:    "Defiliama slug of the adopting protocol",
+						Required: true,
+					},
+					&cli.Int64Flag{
+						Name:     "chain",
+						Usage:    "Chain ID of the adoption transaction",
 						Required: true,
 					},
 					&cli.StringFlag{
-						Name:     "defiliama-slug",
-						Usage:    "Defiliama slug of the adopting protocol",
+						Name:     "txhash",
+						Usage:    "Transaction hash of the safe harbor adoption",
 						Required: true,
+					},
+					&cli.StringFlag{
+						Name:  "adoptionProposalUri",
+						Usage: "URI of the adoption proposal",
+					},
+					&cli.StringFlag{
+						Name:  "bugBounty",
+						Usage: "Protocol's bug bounty program URL",
 					},
 					&cli.BoolFlag{
 						Name:  "force",
@@ -244,11 +257,13 @@ func main() {
 
 	err := app.Run(os.Args)
 	if err != nil {
-		telegram.SendNotification(
-			fmt.Sprintf("Error running SHDB: %s", err),
-			os.Getenv("TELEGRAM_BOT_TOKEN"),
-			os.Getenv("TELEGRAM_CHAT_ID"),
-		)
+		if os.Getenv("DEV") != "1" {
+			telegram.SendNotification(
+				fmt.Sprintf("Error running SHDB: %s", err),
+				os.Getenv("TELEGRAM_BOT_TOKEN"),
+				os.Getenv("TELEGRAM_CHAT_ID"),
+			)
+		}
 
 		slog.Error("app.Run", "error", err)
 		os.Exit(1)
@@ -269,19 +284,19 @@ func runAddAdoption(cCtx *cli.Context) error {
 
 	protocolCol, agreementCol := getCollectionNames(cCtx)
 
-	fClient, err := firebase.NewFirestoreClient()
+	err := addAdoptionOnchain(
+		protocolCol,
+		agreementCol,
+		slug,
+		chain,
+		txhash,
+		adoptionProposalUri,
+		bugBounty,
+		force,
+		&AgreementDetailsV1Fetcher{chain: chain},
+	)
 	if err != nil {
-		return fmt.Errorf("NewFirestoreClient: %w", err)
-	}
-
-	eClient, err := getChainClient(chain)
-	if err != nil {
-		return err
-	}
-
-	err = addAdoption(eClient, fClient, protocolCol, agreementCol, slug, chain, txhash, adoptionProposalUri, bugBounty, force)
-	if err != nil {
-		return fmt.Errorf("addAdoption: %w", err)
+		return fmt.Errorf("addAdoptionOnchain: %w", err)
 	}
 
 	return nil
@@ -300,47 +315,49 @@ func runAddAdoptionV2(cCtx *cli.Context) error {
 
 	protocolCol, agreementCol := getCollectionNames(cCtx)
 
-	fClient, err := firebase.NewFirestoreClient()
+	err := addAdoptionOnchain(protocolCol,
+		agreementCol,
+		slug,
+		chain,
+		txhash,
+		adoptionProposalUri,
+		bugBounty,
+		force,
+		&AgreementDetailsV2Fetcher{chain: chain},
+	)
 	if err != nil {
-		return fmt.Errorf("NewFirestoreClient: %w", err)
-	}
-
-	eClient, err := getChainClient(chain)
-	if err != nil {
-		return err
-	}
-
-	err = addAdoptionV2(eClient, fClient, protocolCol, agreementCol, slug, chain, txhash, adoptionProposalUri, bugBounty, force)
-	if err != nil {
-		return fmt.Errorf("addAdoptionV2: %w", err)
+		return fmt.Errorf("addAdoptionOnchain: %w", err)
 	}
 
 	return nil
 }
 
-func runAddImmunefiAdoption(cCtx *cli.Context) error {
+func runAddAdoptionV3(cCtx *cli.Context) error {
 	_ = godotenv.Load()
 
-	//* Load config
-	immunefiSlug := cCtx.String("immunefi-slug")
-	defiliamaSlug := cCtx.String("defiliama-slug")
+	slug := cCtx.String("slug")
+	chain := cCtx.Int("chain")
+	txHashStr := cCtx.String("txhash")
 	force := cCtx.Bool("force")
+	adoptionProposalUri := cCtx.String("adoptionProposalUri")
+	bugBounty := cCtx.String("bugBounty")
+	txhash := common.HexToHash(txHashStr)
 
 	protocolCol, agreementCol := getCollectionNames(cCtx)
 
-	fClient, err := firebase.NewFirestoreClient()
+	err := addAdoptionOnchain(
+		protocolCol,
+		agreementCol,
+		slug,
+		chain,
+		txhash,
+		adoptionProposalUri,
+		bugBounty,
+		force,
+		&AgreementDetailsV3Fetcher{chain: chain},
+	)
 	if err != nil {
-		return fmt.Errorf("NewFirestoreClient: %w", err)
-	}
-
-	iClient, err := immunefi.NewClient()
-	if err != nil {
-		return fmt.Errorf("NewClient: %w", err)
-	}
-
-	err = addImmunefiAdoption(iClient, fClient, protocolCol, agreementCol, immunefiSlug, defiliamaSlug, force)
-	if err != nil {
-		return fmt.Errorf("addImmunefiAdoption: %w", err)
+		return fmt.Errorf("addAdoptionOnchain: %w", err)
 	}
 
 	return nil
@@ -484,34 +501,23 @@ func runCheckNewAdoptions(cCtx *cli.Context) error {
 		return fmt.Errorf("NewFirestoreClient: %w", err)
 	}
 
-	iClient, err := immunefi.NewClient()
-	if err != nil {
-		return fmt.Errorf("NewClient: %w", err)
-	}
-
 	cClient, err := cantina.NewClient()
 	if err != nil {
 		return fmt.Errorf("NewClient: %w", err)
 	}
 
 	//* Get new adoptions
-	newImmunefiAdoptions, err := checkNewImmunefiAdoptions(iClient, fClient, agreementCol)
-	if err != nil {
-		return err
-	}
-
 	newCantinaAdoptions, err := checkNewCantinaAdoptions(cClient, fClient, agreementCol)
 	if err != nil {
 		return err
 	}
 
-	newOnchainAdoptions, err := checkNewOnchainAdoptions(fClient, agreementCol, false)
+	newOnchainAdoptions, err := checkNewOnchainAdoptions(fClient, agreementCol)
 	if err != nil {
 		return fmt.Errorf("checkNewOnchainAdoptions: %w", err)
 	}
 
-	newAdoptions := make([]string, 0, len(newImmunefiAdoptions)+len(newOnchainAdoptions))
-	newAdoptions = append(newAdoptions, newImmunefiAdoptions...)
+	var newAdoptions []string
 	newAdoptions = append(newAdoptions, newCantinaAdoptions...)
 	newAdoptions = append(newAdoptions, newOnchainAdoptions...)
 
@@ -538,9 +544,12 @@ func runCheckNewAdoptions(cCtx *cli.Context) error {
 	return nil
 }
 
-func addAdoption(
-	eClient *ethclient.Client,
-	fClient *firestore.Client,
+type DetailFetcher interface {
+	GetDetails(txhash common.Hash) (common.Address, interface{}, error)
+}
+
+// Universal adoption addter for v1, 2, and 3
+func addAdoptionOnchain(
 	protocolCol string,
 	agreementCol string,
 	slug string,
@@ -549,7 +558,18 @@ func addAdoption(
 	adoptionProposalUri string,
 	bugBounty string,
 	force bool,
+	detailFetcher DetailFetcher,
 ) error {
+	fClient, err := firebase.NewFirestoreClient()
+	if err != nil {
+		return fmt.Errorf("NewFirestoreClient: %w", err)
+	}
+
+	eClient, err := getChainClient(chain)
+	if err != nil {
+		return fmt.Errorf("getChainClient: %w", err)
+	}
+
 	protocol, err := defiliama.GetProtocol(slug)
 	if err != nil {
 		slog.Error("defiliama.GetProtocol", "slug", slug, "error", err)
@@ -579,40 +599,25 @@ func addAdoption(
 		return fmt.Errorf("types.Sender: %w", err)
 	}
 
-	agreementAddress, rawAgreement, err := safeharbor.GetAgreement(txhash, eClient)
+	agreementAddress, details, err := detailFetcher.GetDetails(txhash)
 	if err != nil {
-		return fmt.Errorf("getAgreement: %w", err)
+		return fmt.Errorf("GetDetails: %w", err)
 	}
 
-	agreementDetails := types.AgreementDetailsV1{}
-	err = agreementDetails.FromRawAgreementDetails(rawAgreement)
-	if err != nil {
-		return fmt.Errorf("FromRawAgreementDetails: %w", err)
-	}
-
-	scanClient, err := getScanClient(chain)
-	if err == nil {
-		slog.Info("Naming addresses...")
-		agreementDetails.TryNameAddresses(scanClient)
-	} else {
-		slog.Warn("getScanClient", "error", err)
-	}
-
-	//* Upload protocol & adoption to firestore if not already present
 	protocolDocRef, err := uploadProtocol(fClient, protocol, protocolCol, force)
 	if err != nil {
 		return fmt.Errorf("uploadProtocol: %w", err)
 	}
 
 	// Create safe harbor adoption
-	fAdoption := types.SafeHarborAgreementV1{
+	fAdoption := types.SafeHarborAgreementGeneric{
 		SafeHarborAgreementBase: types.SafeHarborAgreementBase{
 			AdoptionProposalURI: adoptionProposalUri,
 			Protocol:            protocolDocRef,
 			Slug:                "onchain-" + txhash.String(),
 			Version:             types.SealV1,
 		},
-		AgreementDetails:    agreementDetails,
+		AgreementDetails:    details,
 		AgreementAddress:    agreementAddress.String(),
 		CreatedAt:           txbody.Time(),
 		Creator:             sender.String(),
@@ -642,60 +647,68 @@ func addAdoption(
 	telegramMessage += fmt.Sprintf("Protocol: %s\n", slug)
 	telegramMessage += fmt.Sprintf("URL: https://safe-harbor-d9e89.web.app/database/%s\n", slug)
 
-	err = telegram.SendNotification(telegramMessage, os.Getenv("TELEGRAM_BOT_TOKEN"), os.Getenv("TELEGRAM_CHAT_ID"))
-	if err != nil {
-		slog.Error("Failed to send Telegram notification", "error", err)
-	}
+	// err = telegram.SendNotification(telegramMessage, os.Getenv("TELEGRAM_BOT_TOKEN"), os.Getenv("TELEGRAM_CHAT_ID"))
+	// if err != nil {
+	// 	slog.Error("Failed to send Telegram notification", "error", err)
+	// }
 
 	return nil
 }
 
-func addAdoptionV2(
-	eClient *ethclient.Client,
-	fClient *firestore.Client,
-	protocolCol string,
-	agreementCol string,
-	slug string,
-	chain int,
-	txhash common.Hash,
-	adoptionProposalUri string,
-	bugBounty string,
-	force bool,
-) error {
-	protocol, err := defiliama.GetProtocol(slug)
-	if err != nil {
-		slog.Error("defiliama.GetProtocol", "slug", slug, "error", err)
-		slog.Info("Falling back to no Defiliama protocol data")
+type AgreementDetailsV1Fetcher struct {
+	chain int
+}
 
-		protocol = types.Protocol{Slug: slug, Name: slug, BugBounty: bugBounty}
+func (f *AgreementDetailsV1Fetcher) GetDetails(txhash common.Hash) (common.Address, interface{}, error) {
+	eClient, err := getChainClient(f.chain)
+	if err != nil {
+		return common.Address{}, nil, fmt.Errorf("getChainClient: %w", err)
 	}
-	protocol.BugBounty = bugBounty
 
-	txbody, _, err := eClient.TransactionByHash(context.Background(), txhash)
+	agreementAddress, rawAgreement, err := safeharbor.GetAgreement(txhash, eClient)
 	if err != nil {
-		return fmt.Errorf("rpc.TransactionByHash: %w", err)
+		return common.Address{}, nil, fmt.Errorf("getAgreement: %w", err)
 	}
-	receipt, err := eClient.TransactionReceipt(context.Background(), txhash)
+
+	agreementDetails := types.AgreementDetailsV1{}
+	err = agreementDetails.FromRawAgreementDetails(rawAgreement)
 	if err != nil {
-		return fmt.Errorf("rpc.TransactionReceipt: %w", err)
+		return common.Address{}, nil, fmt.Errorf("FromRawAgreementDetails: %w", err)
 	}
-	sender, err := eClient.TransactionSender(context.Background(), txbody, receipt.BlockHash, receipt.TransactionIndex)
+
+	scanClient, err := getScanClient(f.chain)
+	if err == nil {
+		slog.Info("Naming addresses...")
+		agreementDetails.TryNameAddresses(scanClient)
+	} else {
+		slog.Warn("getScanClient", "error", err)
+	}
+
+	return *agreementAddress, agreementDetails, nil
+}
+
+type AgreementDetailsV2Fetcher struct {
+	chain int
+}
+
+func (f *AgreementDetailsV2Fetcher) GetDetails(txhash common.Hash) (common.Address, interface{}, error) {
+	eClient, err := getChainClient(f.chain)
 	if err != nil {
-		return fmt.Errorf("types.Sender: %w", err)
+		return common.Address{}, nil, fmt.Errorf("getChainClient: %w", err)
 	}
 
 	agreementAddress, err := safeharbor.GetAgreementAddress(txhash, eClient)
 	if err != nil {
-		return fmt.Errorf("GetAgreementAddress: %w", err)
+		return common.Address{}, nil, fmt.Errorf("GetAgreementAddress: %w", err)
 	}
 
 	v2Contract, err := adoptv2.NewAdoptiondetails(*agreementAddress, eClient)
 	if err != nil {
-		return fmt.Errorf("adoptiondetailsv2.NewAdoptiondetails: %w", err)
+		return common.Address{}, nil, fmt.Errorf("adoptiondetailsv2.NewAdoptiondetails: %w", err)
 	}
 	rawDetails, err := v2Contract.GetDetails(nil)
 	if err != nil {
-		return fmt.Errorf("adoptiondetailsv2.GetDetails: %w", err)
+		return common.Address{}, nil, fmt.Errorf("adoptiondetailsv2.GetDetails: %w", err)
 	}
 
 	details := types.AgreementDetailsV2{}
@@ -706,109 +719,43 @@ func addAdoptionV2(
 		return getScanClient(chainID)
 	})
 
-	protocolDocRef, err := uploadProtocol(fClient, protocol, protocolCol, force)
-	if err != nil {
-		return fmt.Errorf("uploadProtocol: %w", err)
-	}
-
-	fAdoption := types.SafeHarborAgreementV2{
-		SafeHarborAgreementBase: types.SafeHarborAgreementBase{
-			AdoptionProposalURI: adoptionProposalUri,
-			Protocol:            protocolDocRef,
-			Slug:                "onchain-" + txhash.String(),
-			Version:             types.SealV2,
-		},
-		AgreementDetails:    details,
-		AgreementAddress:    agreementAddress.String(),
-		CreatedAt:           txbody.Time(),
-		Creator:             sender.String(),
-		RegistryTransaction: txhash.String(),
-		RegistryChainID:     chain,
-	}
-
-	slog.Info("Uploading V2 adoption", "adoption", txhash.String())
-	agreementDocRef := fClient.Collection(agreementCol).Doc(txhash.String())
-	if _, err := agreementDocRef.Set(context.Background(), fAdoption); err != nil {
-		return fmt.Errorf("firestore.Set: %w", err)
-	}
-
-	slog.Info("Updating protocol with safe harbor agreement reference")
-	protocol.SafeHarborAgreement = agreementDocRef
-	if _, err := protocolDocRef.Set(context.Background(), protocol); err != nil {
-		return fmt.Errorf("firestore.Set: %w", err)
-	}
-
-	slog.Info("Successfully added V2 adoption to database")
-	telegramMessage := "🚨 New Safe Harbor Adoption (V2)\n\n"
-	telegramMessage += fmt.Sprintf("Protocol: %s\n", slug)
-	telegramMessage += fmt.Sprintf("URL: https://safe-harbor-d9e89.web.app/database/%s\n", slug)
-	if err := telegram.SendNotification(telegramMessage, os.Getenv("TELEGRAM_BOT_TOKEN"), os.Getenv("TELEGRAM_CHAT_ID")); err != nil {
-		slog.Error("Failed to send Telegram notification", "error", err)
-	}
-	return nil
+	return *agreementAddress, details, nil
 }
 
-func addImmunefiAdoption(
-	iClient *immunefi.Client,
-	fClient *firestore.Client,
-	protocolCol string,
-	agreementCol string,
-	immunefiSlug string,
-	defiliamaSlug string,
-	force bool,
-) error {
-	protocol, err := defiliama.GetProtocol(defiliamaSlug)
-	if err != nil {
-		slog.Error("defiliama.GetProtocol", "slug", defiliamaSlug, "error", err)
-		slog.Info("Falling back to no Defiliama protocol data")
+type AgreementDetailsV3Fetcher struct {
+	chain int
+}
 
-		protocol = types.Protocol{
-			Slug: defiliamaSlug,
-			Name: defiliamaSlug,
-		}
+func (f *AgreementDetailsV3Fetcher) GetDetails(txhash common.Hash) (common.Address, interface{}, error) {
+	eClient, err := getChainClient(f.chain)
+	if err != nil {
+		return common.Address{}, nil, fmt.Errorf("getChainClient: %w", err)
 	}
 
-	// Fetch safe harbor agreement from Immunefi
-	agreement, err := iClient.GetAgreement(immunefiSlug)
+	agreementAddress, err := safeharbor_v3.GetAgreementAddress(txhash, eClient)
 	if err != nil {
-		return fmt.Errorf("GetAgreement: %w", err)
+		return common.Address{}, nil, fmt.Errorf("GetAgreementAddress: %w", err)
 	}
 
-	//* Upload protocol & adoption to firestore if not already present
-	protocolDocRef, err := uploadProtocol(fClient, protocol, protocolCol, force)
+	v2Contract, err := adoptv2.NewAdoptiondetails(*agreementAddress, eClient)
 	if err != nil {
-		return fmt.Errorf("uploadProtocol: %w", err)
-	}
-	agreement.Protocol = protocolDocRef
-
-	// Upload safe harbor adoption
-	slug := "immunefi-" + immunefiSlug
-	slog.Info("Uploading adoption", "adoption", slug)
-	agreementDocRef := fClient.Collection(agreementCol).Doc(slug)
-	_, err = agreementDocRef.Set(context.Background(), agreement)
-	if err != nil {
-		return fmt.Errorf("firestore.Set: %w", err)
+		return common.Address{}, nil, fmt.Errorf("NewSafeHarbor: %w", err)
 	}
 
-	// Update protocol with safe harbor agreement reference
-	slog.Info("Updating protocol with safe harbor agreement reference")
-	protocol.SafeHarborAgreement = agreementDocRef
-	_, err = protocolDocRef.Set(context.Background(), protocol)
+	rawDetails, err := v2Contract.GetDetails(nil)
 	if err != nil {
-		return fmt.Errorf("firestore.Set: %w", err)
+		return common.Address{}, nil, fmt.Errorf("GetAgreementDetails: %w", err)
 	}
 
-	slog.Info("Successfully added adoption to database")
-	// Send Telegram notification
-	telegramMessage := "🚨 New Immunefi Safe Harbor Adoption\n\n"
-	telegramMessage += fmt.Sprintf("Protocol: %s\n", slug)
-	telegramMessage += fmt.Sprintf("URL: https://safe-harbor-d9e89.web.app/%s\n", slug)
+	details := types.AgreementDetailsV2{}
+	details.FromRawAgreementDetails(rawDetails)
 
-	err = telegram.SendNotification(telegramMessage, os.Getenv("TELEGRAM_BOT_TOKEN"), os.Getenv("TELEGRAM_CHAT_ID"))
-	if err != nil {
-		slog.Error("Failed to send Telegram notification", "error", err)
-	}
-	return nil
+	// Best-effort naming for EVM chains using CAIP-2 eip155:<id>
+	details.TryNameAddressesByCAIP2(func(chainID int) (scan.Client, error) {
+		return getScanClient(chainID)
+	})
+
+	return *agreementAddress, details, nil
 }
 
 func addCantinaAdoption(
@@ -1010,31 +957,6 @@ func refreshAdoptionDate(
 	return nil
 }
 
-func checkNewImmunefiAdoptions(iClient *immunefi.Client, fClient *firestore.Client, agreementCol string) ([]string, error) {
-	agreements, err := iClient.GetAgreements()
-	if err != nil {
-		return nil, fmt.Errorf("immunefi.GetAgreements: %w", err)
-	}
-
-	agreementsDoc, err := fClient.Collection(agreementCol).Documents(context.Background()).GetAll()
-	if err != nil {
-		return nil, fmt.Errorf("firestore.GetAll: %w", err)
-	}
-
-	existingAdoptions := make(map[string]bool)
-	for _, doc := range agreementsDoc {
-		existingAdoptions[doc.Ref.ID] = true
-	}
-
-	var newAdoptions []string
-	for _, agreement := range agreements {
-		if _, exists := existingAdoptions[agreement.Slug]; !exists {
-			newAdoptions = append(newAdoptions, agreement.Slug)
-		}
-	}
-	return newAdoptions, nil
-}
-
 func checkNewCantinaAdoptions(cClient *cantina.Client, fClient *firestore.Client, agreementCol string) ([]string, error) {
 	agreements, err := cClient.GetAgreements()
 	if err != nil {
@@ -1060,7 +982,7 @@ func checkNewCantinaAdoptions(cClient *cantina.Client, fClient *firestore.Client
 	return newAdoptions, nil
 }
 
-func checkNewOnchainAdoptions(fClient *firestore.Client, agreementCol string, full bool) ([]string, error) {
+func checkNewOnchainAdoptions(fClient *firestore.Client, agreementCol string) ([]string, error) {
 	existingAdoptions := make(map[string]bool)
 	agreementDocs, err := fClient.Collection(agreementCol).Documents(context.Background()).GetAll()
 	if err != nil {
@@ -1075,7 +997,7 @@ func checkNewOnchainAdoptions(fClient *firestore.Client, agreementCol string, fu
 	var allNewAdoptions = make(map[string]bool)
 	for chainID := range config.SafeHarborV1Registries {
 		slog.Info("Checking chain for new adoptions...", "chainID", chainID)
-		adoptions, err := checkChainForAdoptions(chainID, full)
+		adoptions, err := checkChainForAdoptions(chainID)
 		if err != nil {
 			slog.Warn("checkChainForAdoptions", "chainID", chainID, "error", err)
 			continue
@@ -1100,7 +1022,7 @@ func checkNewOnchainAdoptions(fClient *firestore.Client, agreementCol string, fu
 	return newAdoptions, nil
 }
 
-func checkChainForAdoptions(chainId int, full bool) ([]string, error) {
+func checkChainForAdoptions(chainId int) ([]string, error) {
 	eClient, err := getChainClient(chainId)
 	if err != nil {
 		return nil, fmt.Errorf("getChainClient: %w", err)
@@ -1221,16 +1143,13 @@ func uploadProtocol(fClient *firestore.Client, protocol types.Protocol, protocol
 }
 
 func getChainClient(chain int) (*ethclient.Client, error) {
-	chainCfg, err := config.LoadChainCfg()
-	if err != nil {
-		return nil, fmt.Errorf("LoadChainCfg: %w", err)
+	rpcUrlEnv := fmt.Sprintf("RPC_URL_%d", chain)
+	rpcUrl := os.Getenv(rpcUrlEnv)
+	if rpcUrl == "" {
+		return nil, fmt.Errorf("Unsupported chain ID %d", chain)
 	}
 
-	if _, exists := chainCfg[chain]; !exists {
-		return nil, fmt.Errorf("chain ID not found in chain config: %d", chain)
-	}
-
-	eClient, err := ethclient.Dial(chainCfg[chain].RpcUrl)
+	eClient, err := ethclient.Dial(rpcUrl)
 	if err != nil {
 		return nil, fmt.Errorf("rpc.Dial: %w", err)
 	}
@@ -1238,16 +1157,8 @@ func getChainClient(chain int) (*ethclient.Client, error) {
 }
 
 func getScanClient(chain int) (scan.Client, error) {
-	chainCfg, err := config.LoadChainCfg()
-	if err != nil {
-		return nil, fmt.Errorf("LoadChainCfg: %w", err)
-	}
-
-	if _, exists := chainCfg[chain]; !exists {
-		return nil, fmt.Errorf("chain ID not found in chain config: %d", chain)
-	}
-
-	scanClient := scan.NewRateLimitedClient(chainCfg[chain].ScanKey, chainCfg[chain].ScanUrl)
+	apiKey := os.Getenv("SCAN_KEY")
+	scanClient := scan.NewRateLimitedClient(apiKey, chain)
 	return scanClient, nil
 }
 

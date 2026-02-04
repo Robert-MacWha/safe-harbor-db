@@ -7,5 +7,6 @@ pkgs.mkShell {
     gopls
     delve
     sops
+    go-ethereum
   ];
 }

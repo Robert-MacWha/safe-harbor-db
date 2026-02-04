@@ -1,118 +1,79 @@
 package scan
 
 import (
+	"encoding/json"
 	"fmt"
+	"net/http"
 	"time"
-
-	"github.com/nanmu42/etherscan-api"
 )
 
-type Tx struct {
-	BlockNumber int
-	TimeStamp   etherscan.Time
-	Hash        string
-	From        string
-	To          string
-	Value       *etherscan.BigInt
-	Input       string
-}
-
 type Client interface {
-	ContractName(address string) (name string)
-	ContractSource(address string) (source etherscan.ContractSource, err error)
-	NormalTxByAddress(address string, startBlock *int, endBlock *int, page int, offset int, desc bool) (txs []Tx, err error)
-	InternalTxByAddress(address string, startBlock *int, endBlock *int, page int, offset int, desc bool) (txs []Tx, err error)
+	ContractName(address string) (name string, err error)
 }
 
 type RateLimitedClient struct {
-	client *etherscan.Client
+	apiKey  string
+	chainID int
+	client  *http.Client
 }
 
-const rateLimit = 200 * time.Millisecond
+const rateLimit = 300 * time.Millisecond
 
-func NewRateLimitedClient(apiKey string, baseURL string) *RateLimitedClient {
-	client := etherscan.NewCustomized(etherscan.Customization{
-		Timeout: 30 * time.Second,
-		Key:     apiKey,
-		BaseURL: baseURL,
-	})
-
-	return &RateLimitedClient{client}
+type EtherscanV2Response struct {
+	Status  string          `json:"status"`
+	Message string          `json:"message"`
+	Result  json.RawMessage `json:"result"` // Delay decoding
 }
 
-func (c *RateLimitedClient) ContractName(address string) (name string) {
-	source, err := c.ContractSource(address)
+type SourceCodeResult struct {
+	ContractName string `json:"ContractName"`
+}
+
+func NewRateLimitedClient(apiKey string, chainID int) *RateLimitedClient {
+	return &RateLimitedClient{
+		apiKey:  apiKey,
+		chainID: chainID,
+		client:  &http.Client{Timeout: 30 * time.Second},
+	}
+}
+
+func (c *RateLimitedClient) ContractName(address string) (string, error) {
+	defer time.Sleep(rateLimit)
+
+	url := fmt.Sprintf(
+		"https://api.etherscan.io/v2/api?chainid=%d&module=contract&action=getsourcecode&address=%s&apikey=%s",
+		c.chainID, address, c.apiKey,
+	)
+
+	// println(url)
+
+	resp, err := c.client.Get(url)
 	if err != nil {
-		return ""
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	var apiResp EtherscanV2Response
+	if err := json.NewDecoder(resp.Body).Decode(&apiResp); err != nil {
+		return "", err
 	}
 
-	return source.ContractName
-}
-
-func (c *RateLimitedClient) ContractSource(address string) (source etherscan.ContractSource, err error) {
-	defer c.sleep()
-
-	sources, err := c.client.ContractSource(address)
-	if err != nil {
-		return etherscan.ContractSource{}, err
+	// If Status is "0", Result is a string (the error message)
+	if apiResp.Status != "1" {
+		var errMsg string
+		_ = json.Unmarshal(apiResp.Result, &errMsg)
+		return "", fmt.Errorf("etherscan error (%s): %s", apiResp.Message, errMsg)
 	}
 
-	if len(sources) == 0 {
-		return etherscan.ContractSource{}, fmt.Errorf("no source found for contract %s", address)
+	// If Status is "1", Result is the expected array
+	var results []SourceCodeResult
+	if err := json.Unmarshal(apiResp.Result, &results); err != nil {
+		return "", fmt.Errorf("failed to decode results: %w", err)
 	}
 
-	return sources[0], nil
-}
-
-func (c *RateLimitedClient) NormalTxByAddress(address string, startBlock *int, endBlock *int, page int, offset int, desc bool) (txs []Tx, err error) {
-	defer c.sleep()
-
-	normalTxns, err := c.client.NormalTxByAddress(address, startBlock, endBlock, page, offset, desc)
-	if err != nil {
-		return nil, err
+	if len(results) == 0 || results[0].ContractName == "" {
+		return "", fmt.Errorf("contract name not found/unverified for %s", address)
 	}
 
-	txs = make([]Tx, len(normalTxns))
-	for i, txn := range normalTxns {
-		txs[i] = Tx{
-			BlockNumber: txn.BlockNumber,
-			TimeStamp:   txn.TimeStamp,
-			Hash:        txn.Hash,
-			From:        txn.From,
-			To:          txn.To,
-			Value:       txn.Value,
-			Input:       txn.Input,
-		}
-	}
-
-	return txs, nil
-}
-
-func (c *RateLimitedClient) InternalTxByAddress(address string, startBlock *int, endBlock *int, page int, offset int, desc bool) (txs []Tx, err error) {
-	defer c.sleep()
-
-	internalTxns, err := c.client.InternalTxByAddress(address, startBlock, endBlock, page, offset, desc)
-	if err != nil {
-		return nil, err
-	}
-
-	txs = make([]Tx, len(internalTxns))
-	for i, txn := range internalTxns {
-		txs[i] = Tx{
-			BlockNumber: txn.BlockNumber,
-			TimeStamp:   txn.TimeStamp,
-			Hash:        txn.Hash,
-			From:        txn.From,
-			To:          txn.To,
-			Value:       txn.Value,
-			Input:       txn.Input,
-		}
-	}
-
-	return txs, nil
-}
-
-// Sleep sleeps for the remaining time until the next call can be made.
-func (c *RateLimitedClient) sleep() {
-	time.Sleep(rateLimit)
+	return results[0].ContractName, nil
 }

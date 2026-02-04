@@ -25,6 +25,8 @@ func (c Client) GetDeployed(address string, blockNumber int, txIndex int, vmStep
 		address, blockNumber, txIndex, vmStepStart, limit,
 	)
 
+	println(url)
+
 	resp, err := http.Get(url)
 	if err != nil {
 		return nil, fmt.Errorf("http.Get: %w", err)

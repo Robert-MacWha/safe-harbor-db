@@ -118,12 +118,12 @@ func (v *AgreementDetailsV2) TryNameAddressesByCAIP2(getScan func(chainID int) (
 			continue
 		}
 		for j, account := range chain.Accounts {
-			name := client.ContractName(account.Address)
+			name, err := client.ContractName(account.Address)
+			if err != nil {
+				slog.Info("Naming address failed", "address", account.Address, "caip2", chain.Caip2ChainId, "error", err)
+			}
 			account.Name = name
 			v.Chains[i].Accounts[j] = account
-			if name == "" {
-				slog.Info("Naming address failed", "address", account.Address, "caip2", chain.Caip2ChainId)
-			}
 		}
 	}
 }

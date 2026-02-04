@@ -1,0 +1,106 @@
+[
+    {
+        "inputs": [
+            {
+                "internalType": "address",
+                "name": "_legacyRegistry",
+                "type": "address"
+            },
+            {
+                "internalType": "address[]",
+                "name": "_adopters",
+                "type": "address[]"
+            }
+        ],
+        "stateMutability": "nonpayable",
+        "type": "constructor"
+    },
+    {
+        "inputs": [],
+        "name": "SafeHarborRegistry__NoAgreement",
+        "type": "error"
+    },
+    {
+        "anonymous": false,
+        "inputs": [
+            {
+                "indexed": true,
+                "internalType": "address",
+                "name": "legacyRegistry",
+                "type": "address"
+            },
+            {
+                "indexed": false,
+                "internalType": "uint256",
+                "name": "migratedCount",
+                "type": "uint256"
+            }
+        ],
+        "name": "LegacyDataMigrated",
+        "type": "event"
+    },
+    {
+        "anonymous": false,
+        "inputs": [
+            {
+                "indexed": true,
+                "internalType": "address",
+                "name": "adopter",
+                "type": "address"
+            },
+            {
+                "indexed": false,
+                "internalType": "address",
+                "name": "agreementAddress",
+                "type": "address"
+            }
+        ],
+        "name": "SafeHarborAdoption",
+        "type": "event"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "address",
+                "name": "_agreementAddress",
+                "type": "address"
+            }
+        ],
+        "name": "adoptSafeHarbor",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "address",
+                "name": "_adopter",
+                "type": "address"
+            }
+        ],
+        "name": "getAgreement",
+        "outputs": [
+            {
+                "internalType": "address",
+                "name": "",
+                "type": "address"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [],
+        "name": "version",
+        "outputs": [
+            {
+                "internalType": "string",
+                "name": "",
+                "type": "string"
+            }
+        ],
+        "stateMutability": "pure",
+        "type": "function"
+    }
+]

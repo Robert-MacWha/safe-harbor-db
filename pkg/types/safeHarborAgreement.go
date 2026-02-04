@@ -53,3 +53,14 @@ type SafeHarborAgreementV2 struct {
 	RegistryChainID     int                `firestore:"registryChainId"`
 	RegistryTransaction string             `firestore:"registryTransaction"`
 }
+
+type SafeHarborAgreementGeneric struct {
+	SafeHarborAgreementBase
+	AgreementAddress    string      `firestore:"agreementAddress"`
+	AgreementDetails    interface{} `firestore:"agreementDetails"`
+	CreatedAt           time.Time   `firestore:"createdAt"`
+	CreatedBlock        int         `firestore:"createdBlock"`
+	Creator             string      `firestore:"creator"`
+	RegistryChainID     int         `firestore:"registryChainId"`
+	RegistryTransaction string      `firestore:"registryTransaction"`
+}

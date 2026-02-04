@@ -90,13 +90,12 @@ func (v *AgreementDetailsV1) FromRawAgreementDetails(d *adoptiondetails.Agreemen
 func (v *AgreementDetailsV1) TryNameAddresses(client scan.Client) {
 	for i, chain := range v.Chains {
 		for j, account := range chain.Accounts {
-			name := client.ContractName(account.Address)
+			name, err := client.ContractName(account.Address)
+			if err != nil {
+				slog.Info("Naming address failed", "address", account.Address, "chainID", chain.ID, "error", err)
+			}
 			account.Name = name
 			v.Chains[i].Accounts[j] = account
-
-			if name == "" {
-				slog.Info("Naming address failed", "address", account.Address, "chainID", chain.ID)
-			}
 		}
 	}
 }
