@@ -651,10 +651,10 @@ func addAdoptionOnchain(
 	telegramMessage += fmt.Sprintf("Protocol: %s\n", slug)
 	telegramMessage += fmt.Sprintf("URL: https://safe-harbor-d9e89.web.app/database/%s\n", slug)
 
-	// err = telegram.SendNotification(telegramMessage, os.Getenv("TELEGRAM_BOT_TOKEN"), os.Getenv("TELEGRAM_CHAT_ID"))
-	// if err != nil {
-	// 	slog.Error("Failed to send Telegram notification", "error", err)
-	// }
+	err = telegram.SendNotification(telegramMessage, os.Getenv("TELEGRAM_BOT_TOKEN"), os.Getenv("TELEGRAM_CHAT_ID"))
+	if err != nil {
+		slog.Error("Failed to send Telegram notification", "error", err)
+	}
 
 	return nil
 }
