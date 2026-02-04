@@ -293,6 +293,7 @@ func runAddAdoption(cCtx *cli.Context) error {
 		adoptionProposalUri,
 		bugBounty,
 		force,
+		types.SealV1,
 		&AgreementDetailsV1Fetcher{chain: chain},
 	)
 	if err != nil {
@@ -323,6 +324,7 @@ func runAddAdoptionV2(cCtx *cli.Context) error {
 		adoptionProposalUri,
 		bugBounty,
 		force,
+		types.SealV2,
 		&AgreementDetailsV2Fetcher{chain: chain},
 	)
 	if err != nil {
@@ -354,6 +356,7 @@ func runAddAdoptionV3(cCtx *cli.Context) error {
 		adoptionProposalUri,
 		bugBounty,
 		force,
+		types.SealV2,
 		&AgreementDetailsV3Fetcher{chain: chain},
 	)
 	if err != nil {
@@ -558,6 +561,7 @@ func addAdoptionOnchain(
 	adoptionProposalUri string,
 	bugBounty string,
 	force bool,
+	version types.SafeHarborVersion,
 	detailFetcher DetailFetcher,
 ) error {
 	fClient, err := firebase.NewFirestoreClient()
@@ -615,7 +619,7 @@ func addAdoptionOnchain(
 			AdoptionProposalURI: adoptionProposalUri,
 			Protocol:            protocolDocRef,
 			Slug:                "onchain-" + txhash.String(),
-			Version:             types.SealV1,
+			Version:             version,
 		},
 		AgreementDetails:    details,
 		AgreementAddress:    agreementAddress.String(),
